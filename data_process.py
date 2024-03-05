@@ -39,7 +39,7 @@ if __name__ == "__main__":
 	sparse_to_adjlist(net_rsr,  './Data/yelp_rsr_adjlists.pickle')
 	sparse_to_adjlist(yelp_homo, './Data/yelp_homo_adjlists.pickle')
 
-	amz = loadmat('./Amazon.mat')
+	amz = loadmat('./Data/Amazon.mat')
 	net_upu = amz['net_upu']
 	net_usu = amz['net_usu']
 	net_uvu = amz['net_uvu']
