@@ -30,31 +30,42 @@ body {
   font-size: 24px;
   color: white;
   font-family: Arial, sans-serif;
-}
-
-.description {
-  position: absolute;
-  top: 40%; /* Adjust as needed */
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 80%; /* Set maximum width for the description */
-  overflow: auto; /* Enable scrollbars if the description exceeds the container width */
   
-  background-color: rgb(0, 0, 0); /* Gray rectangle background */
-  color: rgb(255, 255, 255); /* Description text color */
-  font-family: Arial, sans-serif; /* Description font */
-  text-align: justify;
 }
 
-.About_us {
-  position: absolute;
-  top: 25%;
-  left: 50%; /* Adjust left position as needed */
-  transform: translateX(-50%) translateY(-50%);
-  font-size: 60px;
-  color: white;
-  font-family: Arial, sans-serif;
+.Log_In {
+    position: absolute;
+    top: 25%;
+    left: 50%; /* Adjust left position as needed */
+    transform: translateX(-50%) translateY(-50%);
+    font-size: 60px;
+    color: white;
+    font-family: Arial, sans-serif;
+  }
 
+.user-icon {
+    position: absolute;
+    top: 37%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px; /* Adjust the width as needed */
+    height: auto; /* Maintain aspect ratio */
+  }
+  
+.input-container_username {
+    position: absolute;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: grey;
+}
+
+.input-container_password {
+    position: absolute;
+    top: 63%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: grey;
 }
 
 .about_us-link {
@@ -86,7 +97,7 @@ body {
     font-family: Arial, sans-serif;
     text-decoration: none; /* Remove underline */
   }
-  
+
   .create_acc-link {
     position: absolute;
     top: 11%;
@@ -96,7 +107,17 @@ body {
     font-family: Arial, sans-serif;
     text-decoration: none; /* Remove underline */
   }
-
+  
+  .playground-link {
+    position: absolute;
+    top: 11%;
+    left: 75%; /* Adjust right position as needed */
+    font-size: 18px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-decoration: none; /* Remove underline */
+  }
+  
   .black_square {
     position: absolute;
     top: 11.5%;
@@ -105,3 +126,5 @@ body {
     height: 2%;
     background-color: rgba(128, 128, 128); 
   }
+  
+

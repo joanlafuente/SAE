@@ -66,10 +66,30 @@ body {
   text-decoration: none; /* Remove underline */
 }
 
+.log_in-link {
+  position: absolute;
+  top: 11%;
+  left: 55%; /* Adjust right position as needed */
+  font-size: 18px;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-decoration: none; /* Remove underline */
+}
+
 .home-link {
   position: absolute;
   top: 11%;
   left: 30%; /* Adjust right position as needed */
+  font-size: 18px;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-decoration: none; /* Remove underline */
+}
+
+.create_acc-link {
+  position: absolute;
+  top: 11%;
+  left: 65%; /* Adjust right position as needed */
   font-size: 18px;
   color: white;
   font-family: Arial, sans-serif;
