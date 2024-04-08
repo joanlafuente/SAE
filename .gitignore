@@ -1,3 +1,9 @@
 *.pickle
 *.mat
 amazon_only_label.gexf
+/error_folder/
+/wandb/
+/Weights/
+/Pickles/
+/Plots/
+/Reports/
