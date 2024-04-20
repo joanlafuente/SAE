@@ -22,7 +22,7 @@ import yaml
 import sys
 
 from utils import *
-from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead
+from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -33,18 +33,18 @@ name_yaml = sys.argv[1]
 print(f'Running {name_yaml}')
 
 # Open a yaml file with the parameters
-with open(f'./SetupsSupervisedContrastive/{name_yaml}.yaml') as file:
+with open(f'./Setups/SupervisedContrastive/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
 if params["data"] == "amz":
-    run_path = f"./RunsSupervisedContrastive/Amazon/{name_yaml}"
+    run_path = f"./Runs/SupervisedContrastive/Amazon/{name_yaml}"
     # Creating a folder for the run files
-    if not os.path.exists(f'./RunsSupervisedContrastive/Amazon/{name_yaml}'):
-        os.makedirs(f'./RunsSupervisedContrastive/Amazon/{name_yaml}')
-        os.makedirs(f'./RunsSupervisedContrastive/Amazon/{name_yaml}/Weights')
-        os.makedirs(f'./RunsSupervisedContrastive/Amazon/{name_yaml}/Plots')
-        os.makedirs(f'./RunsSupervisedContrastive/Amazon/{name_yaml}/Report')
-        os.makedirs(f'./RunsSupervisedContrastive/Amazon/{name_yaml}/Pickles')
+    if not os.path.exists(f'{run_path}'):
+        os.makedirs(f'{run_path}')
+        os.makedirs(f'{run_path}/Weights')
+        os.makedirs(f'{run_path}/Plots')
+        os.makedirs(f'{run_path}/Report')
+        os.makedirs(f'{run_path}/Pickles')
 
     # Loading data
     data_file = loadmat('./Data/Amazon.mat')
@@ -106,14 +106,15 @@ if params["data"] == "amz":
                 train_mask_contrastive=train_mask_contrastive)
 
 elif params["data"] == "yelp":
-    run_path = f"./RunsSupervisedContrastive/Yelp/{name_yaml}"
+    run_path = f"./Runs/SupervisedContrastive/Yelp/{name_yaml}"
     # Creating a folder for the run files
-    if not os.path.exists(f'./RunsSupervisedContrastive/Yelp/{name_yaml}'):
-        os.makedirs(f'./RunsSupervisedContrastive/Yelp/{name_yaml}')
-        os.makedirs(f'./RunsSupervisedContrastive/Yelp/{name_yaml}/Weights')
-        os.makedirs(f'./RunsSupervisedContrastive/Yelp/{name_yaml}/Plots')
-        os.makedirs(f'./RunsSupervisedContrastive/Yelp/{name_yaml}/Report') 
-        os.makedirs(f'./RunsSupervisedContrastive/Yelp/{name_yaml}/Pickles')
+    if not os.path.exists(f'{run_path}'):
+        os.makedirs(f'{run_path}')
+        os.makedirs(f'{run_path}/Weights')
+        os.makedirs(f'{run_path}/Plots')
+        os.makedirs(f'{run_path}/Report')
+        os.makedirs(f'{run_path}/Pickles')
+
     # Loading data
     data_file = loadmat('./Data/YelpChi.mat')
     labels = data_file['label'].flatten()
@@ -186,6 +187,8 @@ elif params["model_name"] == 'GCN_Att':
     model = GCN_Att(**params['model'])
 elif params["model_name"] == 'GCN_Att_Drop_Multihead':
     model = GCN_Att_Drop_Multihead(**params['model'])
+elif params["model_name"] == 'GCN_Att_Not_res':
+    model = GCN_Att_Not_res(**params['model'])
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 
@@ -272,7 +275,7 @@ if out.shape[1] > 2:
     plt.xlabel('t-SNE feature 1')
     plt.ylabel('t-SNE feature 2')
     plt.legend()
-    plt.savefig(f'{run_path}/Plots/embeds_contr_sup_{name_yaml}.png')
+    plt.savefig(f'{run_path}/Plots/embeds_contr_sup_{name_yaml}_train.png')
     plt.close()
 else:
     # As the embeddings are already 2D, we can directly plot them
@@ -346,6 +349,7 @@ if params["train_head"]:
     model = train_node_classifier_minibatches(model=model, graph=graph, config=params, 
                                             criterion=criterion, optimizer=optimizer_gcn, only_head=True, 
                                             name_model=f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth')
+    # model.load_state_dict(torch.load(f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth'))
 
     test_acc, f1, predictions = eval_node_classifier(model, graph, graph.test_mask)
     print(f'Test Acc: {test_acc:.3f}, Test F1: {f1:.3f}')
@@ -361,5 +365,5 @@ if params["train_head"]:
     from sklearn.metrics import classification_report
     report = classification_report(graph.y[graph.test_mask].cpu().numpy(), predictions[graph.test_mask].cpu().numpy(), output_dict=True)
 
-    with open(f'{run_path}/Reports/contr_sup_{name_yaml}.txt', 'w') as file:
+    with open(f'{run_path}/Report/contr_sup_{name_yaml}.txt', 'w') as file:
         file.write(str(report))

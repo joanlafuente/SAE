@@ -1,0 +1,31 @@
+run_name: "Run4_Amz"
+data: "amz"
+
+# Per propagar alhora la loss del triplet i la crossentropy
+ContrastiveAndClassification: True
+weight_triplet: 0.4
+weight_classification: 1
+
+batch_size: 150
+epochs: 100
+early_stopping: 30
+lr: 0.001
+weight_decay: 0.0001
+
+triplets:
+  mining_margin: 1
+  loss_margin: 1
+
+model_name: "GCN_Att_Not_res"
+model:
+  dropout: 0.3
+  hidden_channels: 40
+  out_channels: 35
+  num_layers: 1
+  in_channels: 25
+
+
+squeduler:
+  type: "StepLR"
+  step_size: 25
+  gamma: 0.65

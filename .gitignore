@@ -1,5 +1,6 @@
 *.pickle
 *.mat
+*.pyc
 *.pth
 amazon_only_label.gexf
 /error_folder/
