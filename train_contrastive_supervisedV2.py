@@ -349,7 +349,7 @@ if params["train_head"]:
     model = train_node_classifier_minibatches(model=model, graph=graph, config=params, 
                                             criterion=criterion, optimizer=optimizer_gcn, only_head=True, 
                                             name_model=f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth')
-    # model.load_state_dict(torch.load(f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth'))
+    model.load_state_dict(torch.load(f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth'))
 
     test_acc, f1, predictions = eval_node_classifier(model, graph, graph.test_mask)
     print(f'Test Acc: {test_acc:.3f}, Test F1: {f1:.3f}')
@@ -364,6 +364,6 @@ if params["train_head"]:
 
     from sklearn.metrics import classification_report
     report = classification_report(graph.y[graph.test_mask].cpu().numpy(), predictions[graph.test_mask].cpu().numpy(), output_dict=True)
-
+    report["ROC_AUC"] = compute_ROC_AUC(model, graph, graph.test_mask)
     with open(f'{run_path}/Report/contr_sup_{name_yaml}.txt', 'w') as file:
         file.write(str(report))

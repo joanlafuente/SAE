@@ -363,6 +363,7 @@ if params["train_head"]:
 
     from sklearn.metrics import classification_report
     report = classification_report(graph.y[graph.test_mask].cpu().numpy(), predictions[graph.test_mask].cpu().numpy(), output_dict=True)
-
+    report["ROC_AUC"] = compute_ROC_AUC(model, graph, graph.test_mask)
+    
     with open(f'{run_path}/Report/contr_sup_{name_yaml}.txt', 'w') as file:
         file.write(str(report))

@@ -9,10 +9,9 @@ from scipy.io import loadmat
 import pickle
 import numpy as np
 from tqdm import tqdm
-from sklearn.metrics import f1_score
 import random
 
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, roc_auc_score, f1_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 import copy
@@ -22,6 +21,17 @@ from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 import wandb
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+def compute_ROC_AUC(model, graph, mask):
+    model.eval()
+    with torch.no_grad():
+        pred = model(graph)[mask]
+        labels = graph.y[mask]
+        pred = F.softmax(pred, dim=1)
+        pred = pred.argmax(dim=1)  # Convert predicted probabilities to class labels
+        pred = pred.cpu().numpy()
+        labels = labels.cpu().numpy()
+        return roc_auc_score(labels, pred)#, multi_class='ovr', average='micro')
+
 
 def eval_node_classifier(model, graph, mask):
 
@@ -447,7 +457,9 @@ def train_node_classifier_minibatches(model, graph, optimizer, config,
     with torch.no_grad():
         preds = model(graph)
         f1_test = f1_score(labels[graph.test_mask].cpu().numpy(), preds[graph.test_mask].argmax(dim=1).cpu().numpy(), average='macro')
-    wandb.log({'Test f1': f1_test}, step=epoch)
+
+    test_ROC_AUC = compute_ROC_AUC(model, graph, graph.test_mask)
+    wandb.log({'Test f1': f1_test, "Test ROC-AUC":test_ROC_AUC}, step=epoch)
     wandb.finish()
     return model
 
@@ -580,6 +592,7 @@ def train_node_embedder_and_classifier_supervised(model, graph, optimizer, crite
         preds = model(graph)
         test_f1 = f1_score(labels[graph.test_mask].cpu().numpy(), preds[graph.test_mask].argmax(dim=1).cpu().numpy(), average='macro')
 
-    wandb.log({'Test precision at 1': test_precision, 'Test F1': test_f1}, step=epoch)
+    test_ROC_AUC = compute_ROC_AUC(model, graph, graph.test_mask)
+    wandb.log({'Test f1': test_f1, "Test ROC-AUC":test_ROC_AUC, 'Test precision at 1': test_precision}, step=epoch)
     wandb.finish()
     return model
