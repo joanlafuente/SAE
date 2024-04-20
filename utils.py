@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import copy
 
-
 from pytorch_metric_learning import losses, miners, distances, testers
 from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 import wandb
@@ -148,24 +147,35 @@ def precision_at_k_embeds(embeds, labels, k=1):
     return precision
 
 def train_node_embedder(model, graph, optimizer, criterion, n_epochs=100, percentage=0.35, name_model='best_model_contrastive.pth'):
+    batch_size = 5000
     loss_history = []
     metric_history = []
     precision_history = []
     best_val_metric = float('inf')
     counter = 0
     squeduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-
+    
     for epoch in tqdm(range(1, n_epochs + 1)):
         model.train()
+        # Get the indices to shuffle the embeddings 
+        num_train_nodes = graph.train_mask_contrastive.sum().item()
+        indices = torch.randperm(num_train_nodes)
 
-        out = model.contrastive(mask_node_atributes(graph, percentage=percentage).to(device))
-        out2 = model.contrastive(mask_node_atributes(graph, percentage=percentage).to(device))
+        for batch in range(0, graph.train_mask.sum().item(), batch_size):
+            out = model.contrastive(mask_node_atributes(graph, percentage=percentage).to(device))
+            out2 = model.contrastive(mask_node_atributes(graph, percentage=percentage).to(device))
 
-        loss = criterion(out[graph.train_mask_contrastive], out2[graph.train_mask_contrastive])
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        loss_history.append(loss.item())
+            out = out[graph.train_mask_contrastive][indices][batch:batch+batch_size]
+            out2 = out2[graph.train_mask_contrastive][indices][batch:batch+batch_size]
+        
+            if len(out) == 0:
+                continue
+
+            loss = criterion(out, out2)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            loss_history.append(loss.item())
         # print(loss.item())        
 
         model.eval()
@@ -184,9 +194,14 @@ def train_node_embedder(model, graph, optimizer, criterion, n_epochs=100, percen
         if epoch % 5 == 0:
             print(f'Epoch: {epoch:03d}, Train Loss: {loss:.3f}')
             print(f'Epoch: {epoch:03d}, Val Loss: {metric:.3f}')
-            precision = precision_at_k(model, graph, graph.val_mask, k=1)
+    
+            embeds = model.contrastive(graph)
+            accuracy_calculator = AccuracyCalculator(include = ("precision_at_1",), k=2047)
+            precision = accuracy_calculator.get_accuracy(query=embeds[graph.val_mask], query_labels=graph.y[graph.val_mask])["precision_at_1"]
             precision_history.append(precision)
             print(f'Epoch: {epoch:03d}, Val Precision at 1: {precision:.3f}')
+
+            del precision, accuracy_calculator, embeds
 
         if counter > 300:
             break
@@ -314,62 +329,33 @@ def train_node_embedder_samp(model, graph, optimizer, criterion, n_epochs=100, p
 
 
 
-def train_node_embedder_supervised(model, graph, optimizer, variation=None, criterion=None, mining_func=None, 
-                                   n_epochs=100, early_stopping=50, name_model='best_model_contrastive_sup.pth', 
-                                   batch_size=320, mining_margin=1, loss_margin=1):
+def train_node_embedder_supervised(model, graph, optimizer, config, 
+                                   name_model='best_model_contrastive_sup.pth'):
     labels = graph.y
-    if criterion is None:
-        distance = distances.CosineSimilarity()
-        loss_func = losses.TripletMarginLoss(margin=loss_margin, distance = distance) # The margin can be diferent to the one used on the miner -> You define what is a semi-hard and hard triplet
-
-    if mining_func is None:
-        distance = distances.CosineSimilarity()
-        mining_func = miners.TripletMarginMiner(margin = mining_margin, distance=distance, type_of_triplets="all")
     
-    loss_history = []
-    metric_history = []
-    precision_history = []
+    distance = distances.CosineSimilarity()
+
+    # The margin can be diferent to the one used on the miner -> You define what is a semi-hard and hard triplet
+    loss_func = losses.TripletMarginLoss(margin = config["triplets"]["loss_margin"], distance = distance) 
+    mining_func = miners.TripletMarginMiner(margin = config["triplets"]["mining_margin"], distance=distance, type_of_triplets="all")
+    
     best_val_precision = float('-inf')
     early_stopping_counter = 0
-    squeduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.65)
-
-    
-    # Check if a class has an atribute
-    if hasattr(model, 'out_channels'):
-        out_channels = model.out_channels
+    if config["squeduler"]["type"] == 'StepLR':
+        squeduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config["squeduler"]["step_size"], gamma=config["squeduler"]["gamma"])
     else:
-        out_channels = 0
+        raise ValueError(f'{config["squeduler"]["type"]} is not a valid squeduler type')
     
-    if hasattr(model, 'hidden_channels'):
-        hidden_channels = model.hidden_channels
-    else:
-        hidden_channels = 0
-    
-    if hasattr(model, 'num_layers'):
-        num_layers = model.num_layers
-    else:
-        num_layers = 0
-    
-    if hasattr(model, 'dropout'):
-        dropout = model.dropout
-    else:
-        dropout = 0
-
     # Init wandb
-    wandb.init(project='Graph contrastive Learning', name=name_model.split('.')[0])
+    wandb.init(project='Supervised contrastive learning', name=config["run_name"])
     wandb.watch(model)
-    wandb.config.update({'batch_size': batch_size, 
-                         'n_epochs': n_epochs, 
-                         'loss_margin': loss_margin, 
-                         'mining_margin': mining_margin,
-                         'early_stopping': early_stopping,
-                         'variation': variation,
-                         'out_channels': out_channels,
-                         'hidden_channels': hidden_channels,
-                         'num_layers': num_layers,
-                         'dropout': dropout,})
+    wandb.config.update(config)
+    
+    from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
+    accuracy_calculator = AccuracyCalculator(include = ("precision_at_1",), k=2047)
 
-    for epoch in tqdm(range(1, n_epochs + 1)):
+    batch_size = config["batch_size"]
+    for epoch in tqdm(range(1, config["epochs"] + 1)):
         model.train()
         epoch_loss = 0
 
@@ -380,7 +366,7 @@ def train_node_embedder_supervised(model, graph, optimizer, variation=None, crit
         
         counter = 0
         # Iterating over the embedings and the labels, on batches
-        for batch in range(0, len(graph.train_mask), batch_size):
+        for batch in range(0, graph.train_mask.sum().item(), batch_size):
             embeds = model.contrastive(graph)
 
             # Shuffle the embeddings and the labels (Same shuffle)
@@ -398,7 +384,6 @@ def train_node_embedder_supervised(model, graph, optimizer, variation=None, crit
             optimizer.step()
             optimizer.zero_grad()
 
-        loss_history.append(epoch_loss/counter)
         # print(loss.item())        
 
         labels = graph.y
@@ -406,47 +391,60 @@ def train_node_embedder_supervised(model, graph, optimizer, variation=None, crit
         model.eval()
         with torch.no_grad():
             embeds = model.contrastive(graph)
-            metric = loss_func(embeds[graph.val_mask], labels[graph.val_mask], mining_func(embeds[graph.val_mask], labels[graph.val_mask]))
+            val_loss = 0
+            counter_val = 0
+            for batch in range(0, graph.val_mask.sum().item(), batch_size):
+                emb = embeds[graph.val_mask][batch:batch+batch_size]
+                y = graph.y[graph.val_mask][batch:batch+batch_size]
+                if len(emb) == 0:
+                    continue
+                indices_tuple = mining_func(emb, y)
+                loss = loss_func(emb, y, indices_tuple)
+                val_loss += loss.item()
+                counter_val += 1
+        val_loss = val_loss/counter_val
         # print(metric)
-        metric_history.append(metric)
 
         early_stopping_counter += 1
         squeduler.step()
 
 
-        precision = precision_at_k_embeds(embeds[graph.val_mask], labels[graph.val_mask], k=1)
-        precision_history.append(precision)
-        train_precision = precision_at_k_embeds(embeds[graph.train_mask], labels[graph.train_mask], k=1)
+        # This function takes embeddings and labels and returns a dictionary of the calculated accuracies
+        accuracies = accuracy_calculator.get_accuracy(query=embeds[graph.val_mask], query_labels=graph.y[graph.val_mask])
+        precision = accuracies["precision_at_1"]
+
+        accuracies_train = accuracy_calculator.get_accuracy(query=embeds[graph.train_mask], query_labels=graph.y[graph.train_mask])
+        train_precision = accuracies_train["precision_at_1"]
+
+
 
         wandb.log({'Train loss': epoch_loss/counter, 
-                   'Val loss': metric, 
+                   'Val loss': val_loss, 
                    'Val precision at 1': precision, 
                    'Train precision at 1': train_precision, 
                    'Current lr': optimizer.param_groups[0]['lr']}, step=epoch)
-
-        if epoch % 5 == 0:
-            print(f'Epoch: {epoch:03d}, Train Loss: {loss:.3f}, Val Loss: {metric:.3f}, Val Precision at 1: {precision:.3f}')
 
         if best_val_precision < precision:
             best_val_precision = precision
             torch.save(model.state_dict(), name_model)
             early_stopping_counter = 0
         
-        if early_stopping_counter > early_stopping:
+        if early_stopping_counter > config["early_stopping"]:
             break
     
 
     model.load_state_dict(torch.load(name_model))
-
-    test_precision = precision_at_k(model, graph, graph.test_mask, k=1)
+    accuracy_calculator = AccuracyCalculator(include = ("precision_at_1",))
+    embeds = model.contrastive(graph)
+    test_precision = accuracy_calculator.get_accuracy(query=embeds[graph.test_mask], query_labels=graph.y[graph.test_mask])["precision_at_1"]
     wandb.log({'Test precision at 1': test_precision}, step=epoch)
     wandb.finish()
     return model
 
 
 
-def train_node_classifier_minibatches(model, graph, optimizer, variation=None, criterion=None, n_epochs=100, 
-                                      early_stopping=50, batch_size=320,
+def train_node_classifier_minibatches(model, graph, optimizer, config, 
+                                      criterion=None, only_head=False,
                                       name_model='best_model_clasifier.pth'):
     labels = graph.y
     if criterion is None:
@@ -454,44 +452,22 @@ def train_node_classifier_minibatches(model, graph, optimizer, variation=None, c
     
     best_val_f1 = float('-inf')
     early_stopping_counter = 0
-    squeduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.65)
-    # squeduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=40, gamma=0.65)
-
-    
-    # Check if a class has an atribute
-    if hasattr(model, 'out_channels'):
-        out_channels = model.out_channels
+    if config["squeduler"]["type"] == 'StepLR':
+        squeduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config["squeduler"]["step_size"], gamma=config["squeduler"]["gamma"])
     else:
-        out_channels = 0
+        raise ValueError(f'{config["squeduler"]["type"]} is not a valid squeduler type')
     
-    if hasattr(model, 'hidden_channels'):
-        hidden_channels = model.hidden_channels
-    else:
-        hidden_channels = 0
-    
-    if hasattr(model, 'num_layers'):
-        num_layers = model.num_layers
-    else:
-        num_layers = 0
-    
-    if hasattr(model, 'dropout'):
-        dropout = model.dropout
-    else:
-        dropout = 0
+    if only_head:
+        config["run_name"] += '_triple_head'
+        config["pretrained_triplet"] = True
 
     # Init wandb
-    wandb.init(project='Graph contrastive Learning', name=name_model.split('.')[0])
+    wandb.init(project='Classical Supervised learning', name=config["run_name"])
     wandb.watch(model)
-    wandb.config.update({'batch_size': batch_size, 
-                         'n_epochs': n_epochs, 
-                         'early_stopping': early_stopping,
-                         'variation': variation,
-                         'out_channels': out_channels,
-                         'hidden_channels': hidden_channels,
-                         'num_layers': num_layers,
-                         'dropout': dropout,})
+    wandb.config.update(config)
 
-    for epoch in tqdm(range(1, n_epochs + 1)):
+    batch_size = config["batch_size"]
+    for epoch in tqdm(range(1, config["epochs"] + 1)):
         model.train()
         epoch_loss = 0
 
@@ -548,7 +524,7 @@ def train_node_classifier_minibatches(model, graph, optimizer, variation=None, c
             torch.save(model.state_dict(), name_model)
             early_stopping_counter = 0
         
-        if early_stopping_counter > early_stopping:
+        if early_stopping_counter > config["early_stopping"]:
             break
     
 

@@ -1,0 +1,222 @@
+import torch
+from torch import nn
+from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader
+from torch_geometric.data import Dataset
+from torch_geometric.nn import GCNConv, GAT
+import torch.nn.functional as F
+from scipy.io import loadmat
+import pickle
+import numpy as np
+from tqdm import tqdm
+from sklearn.metrics import f1_score
+import random
+
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+import seaborn as sns
+import copy
+import os
+import sys
+
+from utils import *
+from models import GCN, Simpler_GCN, Simpler_GCN2, Simpler_GCN_Conv, GCN_Att, GCN_Att_Drop_Multihead
+import yaml
+
+
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+print('Device:', device)
+
+# Get the name of the yaml file
+name_yaml = sys.argv[1]
+print(f'Running {name_yaml}')
+
+# Open a yaml file with the parameters
+with open(f'./SetupsSupervised/{name_yaml}.yaml') as file:
+    params = yaml.load(file, Loader=yaml.FullLoader)
+
+if params["data"] == "amz":
+    run_path = f"./RunsSupervised/Amazon/{name_yaml}"
+    # Creating a folder for the run files
+    if not os.path.exists(f'./RunsSupervised/Amazon/{name_yaml}'):
+        os.makedirs(f'./RunsSupervised/Amazon/{name_yaml}')
+        os.makedirs(f'./RunsSupervised/Amazon/{name_yaml}/Weights')
+        os.makedirs(f'./RunsSupervised/Amazon/{name_yaml}/Plots')
+        os.makedirs(f'./RunsSupervised/Amazon/{name_yaml}/Report')
+
+    # Loading data
+    data_file = loadmat('./Data/Amazon.mat')
+    labels = data_file['label'].flatten()
+    feat_data = data_file['features'].todense().A
+
+    train_mask = torch.zeros(11944, dtype=torch.bool)
+    val_mask = torch.zeros(11944, dtype=torch.bool)
+    test_mask = torch.zeros(11944, dtype=torch.bool)
+    train_mask_contrastive = torch.zeros(11944, dtype=torch.bool)
+
+    nodes = list(range(3305, 11944))
+    train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.6, stratify=labels[nodes], random_state=0)
+    val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
+    train_nodes_contrastive = train_nodes + list(range(0, 3305))
+
+    train_mask[train_nodes] = True
+    val_mask[val_nodes] = True
+    test_mask[test_nodes] = True
+    train_mask_contrastive[train_nodes_contrastive] = True
+
+
+    with open('./Data/amz_upu_adjlists.pickle', 'rb') as file:
+        upu = pickle.load(file)
+
+    with open('./Data/amz_usu_adjlists.pickle', 'rb') as file:
+        usu = pickle.load(file)
+
+    with open('./Data/amz_uvu_adjlists.pickle', 'rb') as file:
+        uvu = pickle.load(file)
+
+    edges_list_p = []
+    for i in range(len(upu)):
+        edges_list_p.extend([(i, node) for node in upu[i]])
+    edges_list_p = np.array(edges_list_p)
+    edges_list_p = edges_list_p.transpose()
+
+    edges_list_s = []
+    for i in range(len(upu)):
+        edges_list_s.extend([(i, node) for node in usu[i]])
+    edges_list_s = np.array(edges_list_s)
+    edges_list_s = edges_list_s.transpose()
+
+    edges_list_v = []
+    for i in range(len(upu)):
+        edges_list_v.extend([(i, node) for node in uvu[i]])
+    edges_list_v = np.array(edges_list_v)
+    edges_list_v = edges_list_v.transpose()
+
+    # Creating graph
+    graph = Data(x=torch.tensor(feat_data).float(), 
+                edge_index_v=torch.tensor(edges_list_v), 
+                edge_index_p=torch.tensor(edges_list_p),
+                edge_index_s=torch.tensor(edges_list_s),
+                y=torch.tensor(labels).type(torch.int64),
+                train_mask=train_mask,
+                val_mask=val_mask,
+                test_mask=test_mask,
+                train_mask_contrastive=train_mask_contrastive)
+
+elif params["data"] == "yelp":
+    run_path = f"./RunsSupervised/Yelp/{name_yaml}"
+    # Creating a folder for the run files
+    if not os.path.exists(f'./RunsSupervised/Yelp/{name_yaml}'):
+        os.makedirs(f'./RunsSupervised/Yelp/{name_yaml}')
+        os.makedirs(f'./RunsSupervised/Yelp/{name_yaml}/Weights')
+        os.makedirs(f'./RunsSupervised/Yelp/{name_yaml}/Plots')
+        os.makedirs(f'./RunsSupervised/Yelp/{name_yaml}/Report')
+    # Loading data
+    data_file = loadmat('./Data/YelpChi.mat')
+    labels = data_file['label'].flatten()
+    feat_data = data_file['features'].todense().A
+
+    num_nodes = feat_data.shape[0]
+
+    train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    val_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    test_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    train_mask_contrastive = torch.zeros(num_nodes, dtype=torch.bool)
+
+    nodes = np.arange(num_nodes)
+    train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.7, stratify=labels, random_state=0)
+    val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
+    train_nodes_contrastive = train_nodes 
+
+    train_mask[train_nodes] = True
+    val_mask[val_nodes] = True
+    test_mask[test_nodes] = True
+    train_mask_contrastive[train_nodes_contrastive] = True
+
+
+    with open('./Data/yelp_rtr_adjlists.pickle', 'rb') as file:
+        upu = pickle.load(file)
+
+    with open('./Data/yelp_rsr_adjlists.pickle', 'rb') as file:
+        usu = pickle.load(file)
+
+    with open('./Data/yelp_rur_adjlists.pickle', 'rb') as file:
+        uvu = pickle.load(file)
+
+    edges_list_p = []
+    for i in range(len(upu)):
+        edges_list_p.extend([(i, node) for node in upu[i]])
+    edges_list_p = np.array(edges_list_p)
+    edges_list_p = edges_list_p.transpose()
+
+    edges_list_s = []
+    for i in range(len(upu)):
+        edges_list_s.extend([(i, node) for node in usu[i]])
+    edges_list_s = np.array(edges_list_s)
+    edges_list_s = edges_list_s.transpose()
+
+    edges_list_v = []
+    for i in range(len(upu)):
+        edges_list_v.extend([(i, node) for node in uvu[i]])
+    edges_list_v = np.array(edges_list_v)
+    edges_list_v = edges_list_v.transpose()
+
+    # Creating graph
+    graph = Data(x=torch.tensor(feat_data).float(), 
+                edge_index_v=torch.tensor(edges_list_v), 
+                edge_index_p=torch.tensor(edges_list_p),
+                edge_index_s=torch.tensor(edges_list_s),
+                y=torch.tensor(labels).type(torch.int64),
+                train_mask=train_mask,
+                val_mask=val_mask,
+                test_mask=test_mask,
+                train_mask_contrastive=train_mask_contrastive)
+
+
+if params["model_name"] == 'Simpler_GCN':
+    model = Simpler_GCN(**params['model'])
+elif params["model_name"] == 'Simpler_GCN_Conv':
+    model = Simpler_GCN_Conv(**params['model'])
+elif params["model_name"] == 'Simpler_GCN2':
+    model = Simpler_GCN2(**params['model'])
+elif params["model_name"] == 'GCN_Att':
+    model = GCN_Att(**params['model'])
+elif params["model_name"] == 'GCN_Att_Drop_Multihead':
+    model = GCN_Att_Drop_Multihead(**params['model'])
+else:
+    raise ValueError(f'{params["model_name"]} is not a valid model name')
+
+model = model.to(device)
+
+graph = graph.to(device)
+
+parameters = filter(lambda p: p.requires_grad, model.parameters())
+
+optimizer_gcn = torch.optim.AdamW(parameters, lr=params["lr"], weight_decay=params["weight_decay"])
+
+train_samples = graph.y[graph.train_mask]
+weight_for_class_0 = len(train_samples) / (len(train_samples[train_samples == 0]) * 2)
+weight_for_class_1 = len(train_samples) / (len(train_samples[train_samples == 1]) * 2)
+criterion = nn.CrossEntropyLoss(weight=torch.tensor([weight_for_class_0, weight_for_class_1]).to(device))
+
+model = train_node_classifier_minibatches(model=model, graph=graph, config=params, 
+                                          criterion=criterion, optimizer=optimizer_gcn, 
+                                          name_model=f'{run_path}/Weights/cls_sup_{name_yaml}.pth')
+
+test_acc, f1, predictions = eval_node_classifier(model, graph, graph.test_mask)
+print(f'Test Acc: {test_acc:.3f}, Test F1: {f1:.3f}')
+
+conf_matrix = confusion_matrix(graph.y[graph.test_mask].cpu().numpy(),
+                               predictions[graph.test_mask].cpu().numpy())
+sns.heatmap(conf_matrix, annot=True, fmt='d')
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.savefig(f'{run_path}/Plots/cm_cls_sup_{name_yaml}.png')
+plt.close()
+
+from sklearn.metrics import classification_report
+report = classification_report(graph.y[graph.test_mask].cpu().numpy(), predictions[graph.test_mask].cpu().numpy(), output_dict=True)
+
+with open(f'{run_path}/Report/cls_{name_yaml}.txt', 'w') as file:
+    file.write(str(report))

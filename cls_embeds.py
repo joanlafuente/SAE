@@ -1,16 +1,24 @@
 import pickle as pkl
 from scipy.io import loadmat
 
-pickle_file_name = "embeds_contr_sup_drop=0.1_hidd=35_out=30_lr=0.001_model=GCN_Att"
+# The first two are the best
+# pickle_file_name = "embeds_contr_sup_drop=0.1_hidd=60_out=50_lr=0.001_model=GCN_Att_Drop_Multihead_Yelp"
+# pickle_file_name = "embeds_contr_sup_drop=0.5_hidd=60_out=50_lr=0.001_model=GCN_Att_Not_res_Yelp"
+
+
+# pickle_file_name = "embeds_contr_sup_drop=0.1_hidd=35_out=30_lr=0.001_model=GCN_Att"
 # pickle_file_name = "embeddings_contrastive_dropout_augmentations"
-with open(f'./Pickles/{pickle_file_name}.pkl', 'rb') as file:
+# with open(f'./Pickles/{pickle_file_name}.pkl', 'rb') as file:
+#    out = pkl.load(file)
+with open('embeddings_contrastive_dropout_augmentations_Yelp.pkl', 'rb') as file:
     out = pkl.load(file)
 
-with open('./Pickles/train_test_val_masks__contr_sup_drop=0.0_hidd=25_out=25_lr=0.001_model=Simpler_GCN.pkl', 'rb') as file:
+with open('./Pickles/train_test_val_masks__contr_sup_drop=0.2_hidd=40_out=35_lr=0.001_model=GCN_Att_Yelp.pkl', 'rb') as file:
+# with open('./Pickles/train_test_val_masks__contr_sup_drop=0.0_hidd=25_out=25_lr=0.001_model=Simpler_GCN.pkl', 'rb') as file:
     train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(file)
 
 
-data_file = loadmat('./Data/Amazon.mat')
+data_file = loadmat('./Data/YelpChi.mat')
 labels = data_file['label'].flatten()
 
 train_labels = labels[train_mask]
@@ -36,7 +44,7 @@ from sklearn.metrics import classification_report
 from sklearn.ensemble import RandomForestClassifier
 print('Random Forest')
 
-clf = RandomForestClassifier(n_estimators=150, class_weight='balanced')
+clf = RandomForestClassifier(class_weight='balanced')
 clf.fit(X_train, train_labels)
 
 y_pred = clf.predict(X_test)
@@ -53,7 +61,7 @@ print(classification_report(test_labels, y_pred))
 print("Gradient boosting")
 from sklearn.ensemble import GradientBoostingClassifier
 
-clf = GradientBoostingClassifier(n_estimators=150)
+clf = GradientBoostingClassifier()
 clf.fit(X_train, train_labels)
 
 y_pred = clf.predict(X_test)
@@ -76,6 +84,13 @@ print(classification_report(test_labels, y_pred))
 
 print("SVM")
 clf = SVC(class_weight='balanced')
+clf.fit(X_train, train_labels)
+
+y_pred = clf.predict(X_test)
+print(classification_report(test_labels, y_pred))
+
+print("Gradient boosting")
+clf = GradientBoostingClassifier()
 clf.fit(X_train, train_labels)
 
 y_pred = clf.predict(X_test)
