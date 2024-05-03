@@ -18,4 +18,4 @@ Users with more than 80% helpful votes are labelled as benign entities and users
 Reviews considered spam are the anomalous nodes.
 
 # 
-Graph anomaly detection project for synthesis-project subject 2024.
+Graph anomaly detection project for synthesis-project subject 2024. 
