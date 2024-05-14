@@ -1,0 +1,29 @@
+run_name: "Run3_Amz"
+data: "amz"
+
+train_autoencoder: True
+searchBestTreshold: True
+
+alpha: 0.1 # Weight of the reconstruction loss that we want to increase (The anomaly class)
+cliping_loss_value: 1000
+
+batch_size: 600
+epochs: 200
+early_stopping: 60
+lr: 0.01
+weight_decay: 0.0001
+
+model_name: "GCN_Att_Not_res_Autoencoder"
+model:
+  dropout: 0.4
+  hidden_channels: 30
+  out_channels_GNN: 25
+  num_layers: 1
+  in_channels: 25
+
+squeduler:
+  type: "StepLR"
+  step_size: 25
+  gamma: 0.4
+
+

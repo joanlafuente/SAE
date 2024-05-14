@@ -1,0 +1,103 @@
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar {
+  height: 100%;
+  width: 0;
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  background-color: #111;
+  overflow-x: hidden;
+  padding-top: 60px;
+  transition: 0.5s;
+  
+}
+.sidebar .title {
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+  padding: 10px;
+ 
+}
+.sidebar .text {
+  color: rgba(159, 159, 159, 0.767);
+  font-size: 20px;
+  font-weight: bold;
+  padding: 10px;
+  
+}
+
+.sidebar a {
+  padding: 8px 8px 8px 32px;
+  text-decoration: none;
+  font-size: 25px;
+  color: #818181;
+  display: block;
+  transition: 0.3s;
+  
+}
+
+.sidebar a:hover {
+  color: #f1f1f1;
+  
+}
+
+.sidebar .closebtn {
+  position: absolute;
+  top: 0;
+  right: 25px;
+  font-size: 36px;
+  margin-left: 50px;
+  
+}
+
+.openbtn {
+  font-size: 20px;
+  cursor: pointer;
+  background-color: #111;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+ 
+}
+
+.openbtn:hover {
+  background-color: #444;
+  
+}
+
+#main {
+  transition: margin-left .5s;
+  padding: 20px;
+}
+
+.graph-container{
+  position: absolute;
+  top: 0;  
+  bottom: 0;
+  left: 20%;
+  right: 0%;
+  z-index: 4;
+}
+
+
+
+
+.close-graph {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #f44336; /* Red background */
+  color: white; /* White text */
+  cursor: pointer; /* Cursor style */
+  padding: 5px 10px; /* Some padding */
+  border: none; /* No border */
+  z-index: 3;
+}
+
+

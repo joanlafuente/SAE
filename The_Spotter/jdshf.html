@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playground</title>
+  <link rel="stylesheet" href="../static/css/playground.css">
+</head>
+<body>
+  <div id="mySidebar" class="sidebar">
+    <a href="javascript:void(0)" class="closebtn" id="closebtn" onclick="closeNav()">&times;</a>
+    <span class="title">The Spotter</span>
+    <hr>
+    <div class="text">Upload Graph</div>
+    <button onclick="displayGraph()" class="btn">Display Amazon Graph</button> <!-- New button -->
+    <button onclick="displayGraph2()" class="btn">Display Yelp Graph</button> <!-- Button for graph 2 -->
+    <div class="text">Filters</div>
+  </div>
+  
+  <div id="main">
+    <button class="openbtn" id="openbtn" onclick="openNav()">&#9776; Open Settings</button>
+  </div>
+  <div class="graph-container">
+    <div class="graph-wrapper">
+      <iframe id="graphFrame" src="{{ graph_file }}" width="900" height="500" style="display: none;"></iframe>
+      <button class="close-graph" id="closeGraph1" style="display: none;">X</button> <!-- Close button for the first graph -->
+    </div>
+  </div>
+  <div class="graph-container">
+    <iframe id="graphFrame2" src="" width="800" height="500" style="display: none;"></iframe>
+    <button class="close-graph" id="closeGraph2" style="display: none;">X</button> <!-- Close button for the second graph -->
+  </div>
+  <script src="../static/js/playground.js"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar {
+  height: 100%;
+  width: 0;
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  background-color: #111;
+  overflow-x: hidden;
+  padding-top: 60px;
+  transition: 0.5s;
+}
+.sidebar .title {
+  color: white;
+  font-size: 20px;
+  font-weight: bold;
+  padding: 10px;
+}
+.sidebar .text {
+  color: rgba(159, 159, 159, 0.767);
+  font-size: 20px;
+  font-weight: bold;
+  padding: 10px;
+}
+
+.sidebar a {
+  padding: 8px 8px 8px 32px;
+  text-decoration: none;
+  font-size: 25px;
+  color: #818181;
+  display: block;
+  transition: 0.3s;
+}
+
+.sidebar a:hover {
+  color: #f1f1f1;
+}
+
+.sidebar .closebtn {
+  position: absolute;
+  top: 0;
+  right: 25px;
+  font-size: 36px;
+  margin-left: 50px;
+}
+
+.openbtn {
+  font-size: 20px;
+  cursor: pointer;
+  background-color: #111;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+}
+
+.openbtn:hover {
+  background-color: #444;
+}
+
+#main {
+  transition: margin-left .5s;
+  padding: 20px;
+}
+
+.graph-container{
+  position: absolute;
+  top: 45%;  
+  left: 48%;
+  transform: translate(-50%, -50%);
+}
+
+
+
+
+.close-graph {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #f44336; /* Red background */
+  color: white; /* White text */
+  cursor: pointer; /* Cursor style */
+  padding: 5px 10px; /* Some padding */
+  border: none; /* No border */
+}
+
+@media screen and (max-height: 450px) {
+  .sidebar {padding-top: 15px;}
+  .sidebar a {font-size: 18px;}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+document.addEventListener("DOMContentLoaded", function () {
+  const openBtn = document.getElementById("openbtn");
+  const closeBtn = document.getElementById("closebtn");
+  const sidebar = document.getElementById("mySidebar");
+  const main = document.getElementById("main");
+  const centered = document.querySelector(".centered");
+
+  openBtn.addEventListener("click", () => {
+    sidebar.style.width = "250px";
+    main.style.marginLeft = "250px";
+    openBtn.style.display = "none"; // Hide the Open Settings button when the sidebar is opened
+  });
+
+  closeBtn.addEventListener("click", () => {
+    sidebar.style.width = "0";
+    main.style.marginLeft = "0";
+    openBtn.style.display = "block"; // Show the Open Settings button when the sidebar is closed
+  });
+});
+
+
+
+
+function displayGraph() {
+  var iframe = document.getElementById("graphFrame");
+  iframe.src = "/playground_graph1"; // Route to serve the first graph
+  iframe.style.display = "block";
+  document.getElementById('closeGraph1').style.display = "block"; // Show the close button
+}
+
+function displayGraph2() {
+  var iframe = document.getElementById('graphFrame2');
+  iframe.src = "/playground_graph2"; // Route to serve the second graph
+  iframe.style.display = "block";
+  document.getElementById('closeGraph2').style.display = "block"; // Show the close button
+}
+
+
+
+
+document.getElementById('closeGraph1').addEventListener('click', function() {
+  document.getElementById('graphFrame').style.display = 'none';
+  this.style.display = 'none';
+});
+
+document.getElementById('closeGraph2').addEventListener('click', function() {
+  document.getElementById('graphFrame2').style.display = 'none';
+  this.style.display = 'none';
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+import os
+import sqlite3
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
+from flask_session import Session
+from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
+from pyvis.network import Network
+
+
+# Configure application
+app = Flask(__name__)
+
+# Configure session to use filesystem (instead of signed cookies)
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
+
+@app.after_request
+def after_request(response):
+    """Ensure responses aren't cached"""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Expires"] = 0
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+# Function to get database connection
+def get_db_connection(db_name):
+    conn = sqlite3.connect(db_name)
+    conn.row_factory = sqlite3.Row  # to access columns by name
+    return conn
+
+@app.route("/")
+def index():
+    """Show index page"""
+
+    return render_template("index.html")
+
+@app.route("/index.html")
+def index_():
+    """Show index page"""
+
+    return render_template("index.html")
+
+@app.route('/about_us.html')
+def about_us():
+    return render_template('about_us.html')
+
+@app.route('/create_acc.html')
+def create_acc():
+    return render_template('create_acc.html')
+
+@app.route('/log_in.html')
+def log_in():
+    return render_template('log_in.html')
+
+@app.route('/playground.html')
+def playground():
+    return render_template('playground.html')
+
+@app.route('/playground_graph1')
+def playground_graph1_route():
+    # Generate the second graph
+    graph_file= generate_playground_graph1()
+    # Return the file path of the second graph
+    return render_template('graph.html', graph_file=graph_file)
+
+def generate_playground_graph1():
+    # Create a pyvis network object
+    graph = Network()
+
+    # Add nodes and edges to the graph (example)
+    graph.add_node(1, label='Node 1')
+    graph.add_node(2, label='Node 2')
+    graph.add_edge(1, 2)
+
+    graph.show_buttons(filter_=['physics'])
+    # Save the graph to a file
+    graph_file = os.path.join(app.static_folder, 'graph.html')
+    graph.write_html(graph_file)
+    print("graph_file1")
+    # Render the playground page with the graph
+    return '/static/graph.html'
+
+
+@app.route('/playground_graph2')
+def playground_graph2_route():
+    # Generate the second graph
+    graph_file, graph = generate_playground_graph2()
+    print(graph_file)
+    # Return the file path of the second graph
+    return render_template('graph.html', graph_file=graph_file)
+
+def generate_playground_graph2():
+    # Create a pyvis network object
+    graph = Network()
+
+    # Add nodes and edges to the graph (example)
+    graph.add_node(1, label='Node 1')
+    graph.add_node(2, label='Node 2')
+    graph.add_node(3, label='Node 3')
+    graph.add_edge(1, 2)
+    graph.add_edge(1, 3)
+    graph.add_edge(3, 2)
+
+    graph.show_buttons(filter_=['physics'])
+    # Save the graph to a file
+    graph_file = os.path.join(app.static_folder, 'graph2.html')
+    graph.write_html(graph_file)
+    print("graph_file2")
+    # Return the file path and the graph object
+    return '/static/graph2.html', graph
+
+
+
+# Add route to serve the graph file
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory('static', path)
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """Log user in"""
+
+    # Forget any user_id
+    session.clear()
+
+    # User reached route via POST (as by submitting a form via POST)
+    if request.method == "POST":
+        # Ensure username was submitted
+
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        # Enusre username and password were submitted
+        if not username or not password:
+            flash("Must provide username and password", "warning")
+            return render_template("login.html")
+        
+        # Query database for username
+        conn = get_db_connection("users.db")
+        user = conn.execute("SELECT * FROM users WHERE username = ?", (request.form.get("username"),)).fetchone()
+        conn.close()
+
+        # Ensure username exists and password is correct
+        if user is None or not check_password_hash(user["password"], request.form.get("password")):
+            flash("Invalid username and/or password")
+            return render_template("login.html")
+        
+        # Remember which user has logged in
+        session["user_id"] = user["id"]
+        session["username"] = user["username"]
+
+        # Redirect user to home page
+        flash("You have successfully logged in")
+        return redirect("/index.html")
+    else:
+        return render_template("login.html")
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    """Register user"""
+
+    # User reached route via POST (as by submitting a form via POST)
+    if request.method == "POST":
+
+        # Ensure username and password were submitted
+        if not request.form.get("username") or not request.form.get("password"):
+            flash("Must provide username and password", "warning")
+            return render_template("register.html")
+        
+        # Ensure password and confirmation match
+        if request.form.get("password") != request.form.get("confirmation"):
+            flash("Password and confirmation must match", "warning")
+            return render_template("register.html")
+        
+        # Query database for username
+        conn = get_db_connection("users.db")
+        username = conn.execute("SELECT * FROM users WHERE username = ?", (request.form.get("username"),)).fetchone()
+        conn.close()
+
+        # Ensure username does not already exist
+        if username:
+            flash("Username already exists", "warning")
+            return render_template("register.html")
+        
+        # Insert new user into database
+        conn = get_db_connection("users.db")
+        conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (request.form.get("username"), generate_password_hash(request.form.get("password"))))
+        conn.commit()
+        conn.close()
+
+        # Redirect user to login page
+        flash("You have successfully registered")
+        return redirect("/login")
+    else:
+        return render_template("register.html")
+
+if __name__ == "__main__":
+    app.run(debug=True, port=8082)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <!DOCTYPE html>
+<html>
+<head>
+    <title>Graph</title>
+    <style>
+        body, html, iframe {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <iframe src="{{ graph_file }}"></iframe>
+</body>
+</html>

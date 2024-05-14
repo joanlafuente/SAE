@@ -1,0 +1,33 @@
+run_name: "Run11_Yelp"
+data: "yelp"
+
+# Per propagar alhora la loss del triplet i la crossentropy
+ContrastiveAndClassification: True
+weight_triplet: 1
+weight_classification: 1
+
+OnlyEval: False
+
+batch_size: 400
+epochs: 100
+early_stopping: 30
+lr: 0.001
+weight_decay: 0.0001
+
+triplets:
+  mining_margin: 1
+  loss_margin: 1
+
+model_name: "GAT_BatchNormalitzation"
+model:
+  dropout: 0.3
+  hidden_channels: 30
+  out_channels: 20
+  num_layers: 2
+  in_channels: 32
+
+
+squeduler:
+  type: "StepLR"
+  step_size: 25
+  gamma: 0.5

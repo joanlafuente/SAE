@@ -1,0 +1,5 @@
+run name: Run1_Yelp
+data: "Yelp"
+
+mat_path: './Data/YelpChi.mat'
+homo_adjlist: './Data/yelp_homo_adjlists.pickle'

@@ -1,0 +1,107 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: black; /* Set the background color to black */
+}
+
+.background {
+  position: absolute;
+  display: block;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+.grey_square {
+  position: absolute;
+  top: 10%;
+  left: 5%;
+  width: 2%;
+  height: 4%;
+  background-color: rgba(128, 128, 128); 
+}
+
+.The_Spotter {
+  position: absolute;
+  font-weight: bold;
+  top: 10%;
+  left: 8%; /* Adjust left position as needed */
+  font-size: 24px;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.description {
+  position: absolute;
+  top: 40%; /* Adjust as needed */
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%; /* Set maximum width for the description */
+  overflow: auto; /* Enable scrollbars if the description exceeds the container width */
+  
+  background-color: rgb(0, 0, 0); /* Gray rectangle background */
+  color: rgb(255, 255, 255); /* Description text color */
+  font-family: Arial, sans-serif; /* Description font */
+  text-align: justify;
+}
+
+.About_us {
+  position: absolute;
+  top: 25%;
+  left: 50%; /* Adjust left position as needed */
+  transform: translateX(-50%) translateY(-50%);
+  font-size: 60px;
+  color: white;
+  font-family: Arial, sans-serif;
+
+}
+
+.about_us-link {
+    position: absolute;
+    top: 11%;
+    left: 40%; /* Adjust right position as needed */
+    font-size: 18px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-decoration: none; /* Remove underline */
+  }
+
+  .log_in-link {
+    position: absolute;
+    top: 11%;
+    left: 55%; /* Adjust right position as needed */
+    font-size: 18px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-decoration: none; /* Remove underline */
+  }
+  
+  .home-link {
+    position: absolute;
+    top: 11%;
+    left: 30%; /* Adjust right position as needed */
+    font-size: 18px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-decoration: none; /* Remove underline */
+  }
+  
+  .create_acc-link {
+    position: absolute;
+    top: 11%;
+    left: 65%; /* Adjust right position as needed */
+    font-size: 18px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-decoration: none; /* Remove underline */
+  }
+
+  .black_square {
+    position: absolute;
+    top: 11.5%;
+    left: 28%;
+    width: 1%;
+    height: 2%;
+    background-color: rgba(128, 128, 128); 
+  }

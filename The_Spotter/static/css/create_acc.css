@@ -1,0 +1,118 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: black; /* Set the background color to black */
+}
+
+.background {
+  position: absolute;
+  display: block;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+.grey_square {
+  position: absolute;
+  top: 10%;
+  left: 5%;
+  width: 2%;
+  height: 4%;
+  background-color: rgba(128, 128, 128); 
+}
+
+.The_Spotter {
+  position: absolute;
+  font-weight: bold;
+  top: 10%;
+  left: 8%; /* Adjust left position as needed */
+  font-size: 24px;
+  color: white;
+  font-family: Arial, sans-serif;
+  
+}
+
+.create_acc {
+    position: absolute;
+    top: 25%;
+    left: 50%; /* Adjust left position as needed */
+    transform: translateX(-50%) translateY(-50%);
+    font-size: 60px;
+    color: white;
+    font-family: Arial, sans-serif;
+  }
+
+.user-icon {
+    position: absolute;
+    top: 37%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px; /* Adjust the width as needed */
+    height: auto; /* Maintain aspect ratio */
+  }
+  
+.input-container_username {
+    position: absolute;
+    top: 55%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: grey;
+}
+
+.input-container_password {
+    position: absolute;
+    top: 63%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: grey;
+}
+
+.about_us-link {
+    position: absolute;
+    top: 11%;
+    left: 40%; /* Adjust right position as needed */
+    font-size: 18px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-decoration: none; /* Remove underline */
+  }
+
+  .log_in-link {
+    position: absolute;
+    top: 11%;
+    left: 55%; /* Adjust right position as needed */
+    font-size: 18px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-decoration: none; /* Remove underline */
+  }
+  
+  .home-link {
+    position: absolute;
+    top: 11%;
+    left: 30%; /* Adjust right position as needed */
+    font-size: 18px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-decoration: none; /* Remove underline */
+  }
+
+  .create_acc-link {
+    position: absolute;
+    top: 11%;
+    left: 65%; /* Adjust right position as needed */
+    font-size: 18px;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-decoration: none; /* Remove underline */
+  }
+  
+  .black_square {
+    position: absolute;
+    top: 11.5%;
+    left: 28%;
+    width: 1%;
+    height: 2%;
+    background-color: rgba(128, 128, 128); 
+  }

@@ -1,0 +1,5 @@
+run name: Run1_Amz
+data: "amz"
+
+mat_path: './Data/Amazon.mat'
+homo_adjlist: './Data/amz_homo_adjlists.pickle'

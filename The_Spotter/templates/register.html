@@ -1,0 +1,32 @@
+{% extends "layout.html" %}
+
+{% block title %} Register {% endblock %}
+
+{% block content %}
+
+<br>
+<br>
+
+<div class="custom-div">
+    <h1>Register </h1>
+    <form action="{{ url_for('register') }}" method="post">
+        <div class="mb-3">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" class="form-control" id="username" name="username" required>
+        </div>
+        <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+        <div class="mb-3">
+            <label for="confirmation" class="form-label">Confirm Password</label>
+            <input type="password" class="form-control" id="confirmation" name="confirmation" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Register</button>
+    </form>
+    <div>
+        <br>
+        <span class="gradient-text">Already have an account?</span> <a href="{{ url_for('login') }}">Log in</a>.
+    </div>
+</div>
+{% endblock %}

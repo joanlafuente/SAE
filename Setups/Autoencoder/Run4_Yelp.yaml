@@ -1,0 +1,35 @@
+run_name: "Run4_Yelp"
+data: "yelp"
+
+
+train_autoencoder: False
+searchBestTreshold: True
+
+BestTreshold:
+  PCA: True
+  n_components: 2
+
+
+alpha: 0.5 # Weight of the reconstruction loss that we want to increase (The anomaly class)
+cliping_loss_value: 1
+
+batch_size: 1500
+epochs: 200
+early_stopping: 60
+lr: 0.01
+weight_decay: 0.0001
+
+model_name: "GCN_Att_Not_res_Autoencoder"
+model:
+  dropout: 0.4
+  hidden_channels: 40
+  out_channels_GNN: 32
+  num_layers: 1
+  in_channels: 32
+
+squeduler:
+  type: "StepLR"
+  step_size: 25
+  gamma: 0.4
+
+

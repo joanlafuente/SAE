@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playground</title>
+  <link rel="stylesheet" href="../static/css/playground.css">
+</head>
+<body>
+  <div id="mySidebar" class="sidebar">
+    <a href="javascript:void(0)" class="closebtn" id="closebtn" onclick="closeNav()">&times;</a>
+    <span class="title">The Spotter</span>
+    <hr>
+    <div class="text">Upload Graph</div>
+    <button onclick="displayGraph()" class="btn">Display Amazon Graph</button> <!-- New button -->
+    <button onclick="displayGraph2()" class="btn">Display Yelp Graph</button> <!-- Button for graph 2 -->
+    <div class="text">Filters</div>
+  </div>
+  
+  <div id="main">
+    <button class="openbtn" id="openbtn" onclick="openNav()">&#9776; Open Settings</button>
+  </div>
+  <div class="graph-container">
+      <iframe id="graphFrame" src="{{ graph_file }}" width="99%" height="99%" style="display: none;"></iframe>
+      <button class="close-graph" id="closeGraph1" style="display: none;">X</button> <!-- Close button for the first graph -->
+  </div>
+  <div class="graph-container">
+    <iframe id="graphFrame2" src="" width="800" height="500" style="display: none;"></iframe>
+    <button class="close-graph" id="closeGraph2" style="display: none;">X</button> <!-- Close button for the second graph -->
+  </div>
+  <script src="../static/js/playground.js"></script>
+</body>
+</html>

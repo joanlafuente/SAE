@@ -22,7 +22,7 @@ import yaml
 import sys
 
 from utils import *
-from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res
+from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -189,6 +189,8 @@ elif params["model_name"] == 'GCN_Att_Drop_Multihead':
     model = GCN_Att_Drop_Multihead(**params['model'])
 elif params["model_name"] == 'GCN_Att_Not_res':
     model = GCN_Att_Not_res(**params['model'])
+elif params["model_name"] == 'GAT_Edge_feat':
+    model = GAT_Edge_feat(**params['model'])
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 
