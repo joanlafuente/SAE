@@ -1,0 +1,106 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: black; /* Set the background color to black */
+}
+
+.background {
+  position: absolute;
+  display: block;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+.grey_square {
+  position: absolute;
+  top: 10%;
+  left: 5%;
+  width: 2%;
+  height: 4%;
+  background-color: rgba(128, 128, 128); 
+}
+
+.See_beyond {
+  position: absolute;
+  top: 35%;
+  left: 5%; /* Adjust left position as needed */
+  transform: translateY(-50%);
+  max-width: 90%;
+  font-size: 72px;
+  color: white;
+  font-family: Lato;
+  text-align: left;
+  margin: 0 auto;
+  text-wrap: balance;
+}
+
+.The_Spotter {
+  position: absolute;
+  font-weight: bold;
+  top: 10%;
+  left: 8%; /* Adjust left position as needed */
+  font-size: 24px;
+  color: white;
+  font-family: Arial, sans-serif;
+  
+}
+
+.text {
+  position: absolute;
+  top: 55%;
+  left: 5%; /* Adjust left position as needed */
+  font-size: 18px;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.about_us-link {
+  position: absolute;
+  top: 11%;
+  left: 40%; /* Adjust right position as needed */
+  font-size: 18px;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-decoration: none; /* Remove underline */
+}
+
+.log_in-link {
+  position: absolute;
+  top: 11%;
+  left: 55%; /* Adjust right position as needed */
+  font-size: 18px;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-decoration: none; /* Remove underline */
+}
+
+.home-link {
+  position: absolute;
+  top: 11%;
+  left: 30%; /* Adjust right position as needed */
+  font-size: 18px;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-decoration: none; /* Remove underline */
+}
+
+.create_acc-link {
+  position: absolute;
+  top: 11%;
+  left: 65%; /* Adjust right position as needed */
+  font-size: 18px;
+  color: white;
+  font-family: Arial, sans-serif;
+  text-decoration: none; /* Remove underline */
+}
+
+.black_square {
+  position: absolute;
+  top: 11.5%;
+  left: 28%;
+  width: 1%;
+  height: 2%;
+  background-color: rgba(128, 128, 128); 
+}
