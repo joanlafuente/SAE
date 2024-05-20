@@ -24,7 +24,7 @@ import os
 import sys
 
 from utils import *
-from models import GCN, Simpler_GCN, Simpler_GCN2, Simpler_GCN_Conv, GCN_Att, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat, GAT_BatchNormalitzation, GAT_SELU_Alphadrop, GIN_ReLU, GIN_tanh, GraphSAGE_model, PNA_model
+from models import GCN, Simpler_GCN, Simpler_GCN2, Simpler_GCN_Conv, GCN_Att, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat, GAT_BatchNormalitzation, GAT_SELU_Alphadrop, GIN_ReLU, GIN_tanh, GraphSAGE_model, PNA_model, PNA_model_2
 import yaml
 
 
@@ -206,6 +206,8 @@ elif params["model_name"] == 'GraphSAGE_model':
     model = GraphSAGE_model(**params['model'])
 elif params["model_name"] == 'PNA_model':
     model = PNA_model(**params['model'])
+elif params["model_name"] == 'PNA_model_2':
+    model = PNA_model_2(**params['model'])
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 
