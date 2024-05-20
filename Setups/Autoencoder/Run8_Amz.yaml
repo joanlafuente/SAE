@@ -1,0 +1,29 @@
+run_name: "Run8_Amz"
+data: "amz"
+
+train_edge_autoencoder: True
+train_autoencoder: False
+searchBestTreshold: False
+getEmbeds: True
+
+batch_size: 1500
+epochs: 250
+early_stopping: 60
+lr: 0.01
+weight_decay: 0.0001
+
+
+model_name: "GAE_model"
+model:
+  dropout_GIN: 0.15
+  dropout: 0.3
+  hidden_channels: 100
+  out_channels: 90
+  num_layers: 2
+  in_channels: 25
+
+
+squeduler:
+  type: "StepLR"
+  step_size: 25
+  gamma: 0.5

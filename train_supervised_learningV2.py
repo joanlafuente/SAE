@@ -24,7 +24,7 @@ import os
 import sys
 
 from utils import *
-from models import GCN, Simpler_GCN, Simpler_GCN2, Simpler_GCN_Conv, GCN_Att, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat, GAT_BatchNormalitzation, GAT_SELU_Alphadrop, GIN_ReLU, GIN_tanh
+from models import GCN, Simpler_GCN, Simpler_GCN2, Simpler_GCN_Conv, GCN_Att, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat, GAT_BatchNormalitzation, GAT_SELU_Alphadrop, GIN_ReLU, GIN_tanh, GraphSAGE_model, PNA_model
 import yaml
 
 
@@ -38,6 +38,9 @@ print(f'Running {name_yaml}')
 # Open a yaml file with the parameters
 with open(f'./Setups/Supervised/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
+
+if "train_data_percentage" not in params.keys():
+    params["train_data_percentage"] = 0.6 if params["data"] == "amz" else 0.7
 
 if params["data"] == "amz":
     run_path = f"./Runs/Supervised/Amazon/{name_yaml}"
@@ -59,7 +62,7 @@ if params["data"] == "amz":
     train_mask_contrastive = torch.zeros(11944, dtype=torch.bool)
 
     nodes = list(range(3305, 11944))
-    train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.6, stratify=labels[nodes], random_state=0)
+    train_nodes, test_val_nodes = train_test_split(nodes, train_size=params["train_data_percentage"], stratify=labels[nodes], random_state=0)
     val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
     train_nodes_contrastive = train_nodes + list(range(0, 3305))
 
@@ -128,7 +131,7 @@ elif params["data"] == "yelp":
     train_mask_contrastive = torch.zeros(num_nodes, dtype=torch.bool)
 
     nodes = np.arange(num_nodes)
-    train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.7, stratify=labels, random_state=0)
+    train_nodes, test_val_nodes = train_test_split(nodes, train_size=params["train_data_percentage"], stratify=labels, random_state=0)
     val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
     train_nodes_contrastive = train_nodes 
 
@@ -199,6 +202,10 @@ elif params["model_name"] == 'GIN_ReLU':
     model = GIN_ReLU(**params['model'])
 elif params["model_name"] == 'GIN_tanh':
     model = GIN_tanh(**params['model'])
+elif params["model_name"] == 'GraphSAGE_model':
+    model = GraphSAGE_model(**params['model'])
+elif params["model_name"] == 'PNA_model':
+    model = PNA_model(**params['model'])
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 

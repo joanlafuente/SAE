@@ -1,6 +1,7 @@
 import torch
 from torch import nn
-from torch_geometric.nn import GCNConv, GAT, GIN
+from torch_geometric.nn import GCNConv, GAT, GIN, GAE, GraphSAGE, PNA
+from torch_geometric.utils import negative_sampling
 
 class GCN(torch.nn.Module):
     def __init__(self, dropout=0):
@@ -697,7 +698,6 @@ class Simpler_GCN_Conv(torch.nn.Module):
         x = self.classifier(x)
         return x
 
-
 class GCN_Att_Not_res_Autoencoder(torch.nn.Module):
     def __init__(self, dropout=0, hidden_channels=10, out_channels_GNN=5, num_layers=1, in_channels=25):
         super().__init__()
@@ -1114,4 +1114,415 @@ class GIN_tanh(torch.nn.Module):
         x = self.contrastive(data)
         x = self.classifier(x)
         return x
+
+
+class GAE_encoder(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_GIN=0):
+        super().__init__()
+        self.activation = nn.Tanh()
+        self.in_norm = nn.BatchNorm1d(in_channels)
+        self.p_norm = nn.BatchNorm1d(out_channels)
+        self.s_norm = nn.BatchNorm1d(out_channels)
+        self.v_norm = nn.BatchNorm1d(out_channels)
+
+
+        self.gin_p = GIN(in_channels=in_channels, 
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_GIN,
+                        )
+        self.gin_s = GIN(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_GIN,
+                        )
+        self.gin_v = GIN(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_GIN,
+                        )
+
+        self.attention = SelfAttention(in_channels, out_channels, out_channels)
+
+    def forward(self, data):
+        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
+        x = self.in_norm(x)
+
+        x_p = self.gin_p(x, edge_index_p)
+        x_p = self.p_norm(x_p)
+        x_p = self.activation(x_p)
+
+        x_s = self.gin_s(x, edge_index_s)
+        x_s = self.s_norm(x_s)
+        x_s = self.activation(x_s)
+
+        x_v = self.gin_v(x, edge_index_v)
+        x_v = self.v_norm(x_v)
+        x_v = self.activation(x_v)
+
+        # Concate the embeddings (batch, 3, out_channels)
+        x_embed = torch.cat((x_p.unsqueeze(1), x_s.unsqueeze(1), x_v.unsqueeze(1)), 1)
+
+        # Apply attention mechanism
+        x = self.attention(x_embed, x)
+
+        return x
+
+
+class GAE_model(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_GIN=0):
+        super().__init__()
+        
+        self.encoder = GAE_encoder(dropout, hidden_channels, out_channels, num_layers, in_channels, dropout_GIN)
+
+        self.z1_proj = nn.Sequential(nn.Linear(out_channels, out_channels),
+                                     nn.BatchNorm1d(out_channels),
+                                     nn.Tanh(),
+                                     nn.Linear(out_channels, out_channels))
+        
+        self.z2_proj = nn.Sequential(nn.Linear(out_channels, out_channels),
+                                     nn.BatchNorm1d(out_channels),
+                                     nn.Tanh(),
+                                     nn.Linear(out_channels, out_channels))
+        
+        self.z3_proj = nn.Sequential(nn.Linear(out_channels, out_channels),
+                                     nn.BatchNorm1d(out_channels),
+                                     nn.Tanh(),
+                                     nn.Linear(out_channels, out_channels))
+
+        self.GAE = GAE(encoder=self.encoder)
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(out_channels, int(out_channels*2/3)),
+            nn.BatchNorm1d(int(out_channels*2/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*2/3), int(out_channels*1/3)),
+            nn.BatchNorm1d(int(out_channels*1/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*1/3), 2),
+        )
     
+    def contrastive(self, data):
+        x = self.GAE.encode(data)
+        
+        z1 = self.z1_proj(x)
+        z2 = self.z2_proj(x)
+        z3 = self.z3_proj(x)
+        return (z1, z2, z3)
+    
+    def compute_loss(self, z, data):
+        z1, z2, z3 = z 
+        pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p, data.edge_index_s, data.edge_index_v
+
+        if "neg_edge_index_p" in data and data.count < 20:
+            neg_edge1, neg_edge2, neg_edge3 = data.neg_edge_index_p, data.neg_edge_index_s, data.neg_edge_index_v
+            data.count += 1
+        else:
+            neg_edge1 = negative_sampling(pos_edge1, z1.size(0), method="dense")
+            neg_edge2 = negative_sampling(pos_edge2, z2.size(0), method="dense")
+            neg_edge3 = negative_sampling(pos_edge3, z3.size(0), method="dense")
+
+            data.neg_edge_index_p = neg_edge1
+            data.neg_edge_index_s = neg_edge2
+            data.neg_edge_index_v = neg_edge3
+            data.count = 0
+    
+        return self.GAE.recon_loss(z1, pos_edge1, neg_edge1) + self.GAE.recon_loss(z2, pos_edge2, neg_edge2) + self.GAE.recon_loss(z3, pos_edge3, neg_edge3)
+
+    def forward(self, data):
+        return self.GAE.encode(data)
+    
+
+
+class GAE_encoder_GAT(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_GIN=0):
+        super().__init__()
+        self.activation = nn.Tanh()
+        self.in_norm = nn.BatchNorm1d(in_channels)
+        self.p_norm = nn.BatchNorm1d(out_channels)
+        self.s_norm = nn.BatchNorm1d(out_channels)
+        self.v_norm = nn.BatchNorm1d(out_channels)
+
+        self.gat_p = GAT(in_channels=in_channels, 
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        v2=True)
+        self.gat_s = GAT(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        v2=True)
+        self.gat_v = GAT(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        v2=True)
+
+    def forward(self, data):
+        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
+        x = self.in_norm(x)
+
+        x_p = self.gat_p(x, edge_index_p)
+        x_p = self.p_norm(x_p)
+        x_p = self.activation(x_p)
+
+        x_s = self.gat_s(x, edge_index_s)
+        x_s = self.s_norm(x_s)
+        x_s = self.activation(x_s)
+
+        x_v = self.gat_v(x, edge_index_v)
+        x_v = self.v_norm(x_v)
+        x_v = self.activation(x_v)
+
+        return (x_p, x_s, x_v)
+    
+
+class GAE_model_GAT(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_GAT=0):
+        super().__init__()
+        
+        self.encoder = GAE_encoder_GAT(dropout, hidden_channels, out_channels, num_layers, in_channels, dropout_GAT)
+
+        self.z1_proj = nn.Sequential(nn.Linear(out_channels, out_channels),
+                                     nn.BatchNorm1d(out_channels),
+                                     nn.Tanh(),
+                                     nn.Linear(out_channels, out_channels))
+        
+        self.z2_proj = nn.Sequential(nn.Linear(out_channels, out_channels),
+                                     nn.BatchNorm1d(out_channels),
+                                     nn.Tanh(),
+                                     nn.Linear(out_channels, out_channels))
+        
+        self.z3_proj = nn.Sequential(nn.Linear(out_channels, out_channels),
+                                     nn.BatchNorm1d(out_channels),
+                                     nn.Tanh(),
+                                     nn.Linear(out_channels, out_channels))
+
+        self.GAE = GAE(encoder=self.encoder)
+
+        self.attention = SelfAttention(in_channels, out_channels, out_channels)
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(out_channels, int(out_channels*2/3)),
+            nn.BatchNorm1d(int(out_channels*2/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*2/3), int(out_channels*1/3)),
+            nn.BatchNorm1d(int(out_channels*1/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*1/3), 2),
+        )
+    
+    def contrastive(self, data):
+        x1, x2, x3 = self.GAE.encode(data)
+        
+        z1 = self.z1_proj(x1)
+        z2 = self.z2_proj(x2)
+        z3 = self.z3_proj(x3)
+        return (z1, z2, z3)
+    
+    def compute_loss(self, z, data):
+        z1, z2, z3 = z 
+        pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p, data.edge_index_s, data.edge_index_v
+
+        if "neg_edge_index_p" in data and data.count < 20:
+            neg_edge1, neg_edge2, neg_edge3 = data.neg_edge_index_p, data.neg_edge_index_s, data.neg_edge_index_v
+            data.count += 1
+        else:
+            neg_edge1 = negative_sampling(pos_edge1, z1.size(0), method="dense")
+            neg_edge2 = negative_sampling(pos_edge2, z2.size(0), method="dense")
+            neg_edge3 = negative_sampling(pos_edge3, z3.size(0), method="dense")
+
+            data.neg_edge_index_p = neg_edge1
+            data.neg_edge_index_s = neg_edge2
+            data.neg_edge_index_v = neg_edge3
+            data.count = 0
+    
+        return self.GAE.recon_loss(z1, pos_edge1, neg_edge1) + self.GAE.recon_loss(z2, pos_edge2, neg_edge2) + self.GAE.recon_loss(z3, pos_edge3, neg_edge3)
+
+    def encode(self, data):
+        x1, x2, x3 = self.GAE.encode(data)
+        # Concate the embeddings (batch, 3, out_channels)
+        x_embed = torch.cat((x1.unsqueeze(1), x2.unsqueeze(1), x3.unsqueeze(1)), 1)
+        # Apply attention mechanism
+        x = self.attention(x_embed, data.x)
+        return x
+    
+    def forward(self, data):
+        x = self.encode(data)
+        x = self.classifier(x)
+        return x
+    
+
+class GraphSAGE_model(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_SAGE=0):
+        super().__init__()
+        self.activation = nn.Tanh()
+        self.in_norm = nn.BatchNorm1d(in_channels)
+        self.p_norm = nn.BatchNorm1d(out_channels)
+        self.s_norm = nn.BatchNorm1d(out_channels)
+        self.v_norm = nn.BatchNorm1d(out_channels)
+
+
+        self.gin_p = GraphSAGE(in_channels=in_channels, 
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_SAGE,
+                        )
+        self.gin_s = GraphSAGE(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_SAGE,
+                        )
+        
+        self.gin_v = GraphSAGE(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_SAGE,
+                        )
+
+        self.attention = SelfAttention(in_channels, out_channels, out_channels)
+
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(out_channels, int(out_channels*2/3)),
+            nn.BatchNorm1d(int(out_channels*2/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*2/3), int(out_channels*1/3)),
+            nn.BatchNorm1d(int(out_channels*1/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*1/3), 2),
+        )
+
+    def contrastive(self, data):
+        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
+        x = self.in_norm(x)
+
+        x_p = self.gin_p(x, edge_index_p)
+        x_p = self.p_norm(x_p)
+        x_p = self.activation(x_p)
+
+        x_s = self.gin_s(x, edge_index_s)
+        x_s = self.s_norm(x_s)
+        x_s = self.activation(x_s)
+
+        x_v = self.gin_v(x, edge_index_v)
+        x_v = self.v_norm(x_v)
+        x_v = self.activation(x_v)
+
+        # Concate the embeddings (batch, 3, out_channels)
+        x_embed = torch.cat((x_p.unsqueeze(1), x_s.unsqueeze(1), x_v.unsqueeze(1)), 1)
+
+        # Apply attention mechanism
+        x = self.attention(x_embed, x)
+
+        return x
+
+    def forward(self, data):
+        x = self.contrastive(data)
+        x = self.classifier(x)
+        return x
+
+
+class PNA_model(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_PNA=0):
+        super().__init__()
+        self.activation = nn.Tanh()
+        self.in_norm = nn.BatchNorm1d(in_channels)
+        self.p_norm = nn.BatchNorm1d(out_channels)
+        self.s_norm = nn.BatchNorm1d(out_channels)
+        self.v_norm = nn.BatchNorm1d(out_channels)
+
+
+        aggregators = ['mean', 'mean', 'mean']
+        scalers = ['identity', 'identity', 'identity']
+        deg = torch.tensor([2, 2, 2])
+
+        self.gin_p = PNA(in_channels=in_channels, 
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+        self.gin_s = PNA(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+        
+        self.gin_v = PNA(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+
+        self.attention = SelfAttention(in_channels, out_channels, out_channels)
+
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(out_channels, int(out_channels*2/3)),
+            nn.BatchNorm1d(int(out_channels*2/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*2/3), int(out_channels*1/3)),
+            nn.BatchNorm1d(int(out_channels*1/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*1/3), 2),
+        )
+
+    def contrastive(self, data):
+        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
+        x = self.in_norm(x)
+
+        x_p = self.gin_p(x, edge_index_p)
+        x_p = self.p_norm(x_p)
+        x_p = self.activation(x_p)
+
+        x_s = self.gin_s(x, edge_index_s)
+        x_s = self.s_norm(x_s)
+        x_s = self.activation(x_s)
+
+        x_v = self.gin_v(x, edge_index_v)
+        x_v = self.v_norm(x_v)
+        x_v = self.activation(x_v)
+
+        # Concate the embeddings (batch, 3, out_channels)
+        x_embed = torch.cat((x_p.unsqueeze(1), x_s.unsqueeze(1), x_v.unsqueeze(1)), 1)
+
+        # Apply attention mechanism
+        x = self.attention(x_embed, x)
+
+        return x
+
+    def forward(self, data):
+        x = self.contrastive(data)
+        x = self.classifier(x)
+        return x

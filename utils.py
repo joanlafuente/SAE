@@ -719,3 +719,87 @@ def train_node_autoencoder(model, graph, optimizer, config,
     wandb.log({'Test loss': test_loss}, step=epoch)
     wandb.finish()
     return model
+
+
+def train_autoencoder_edges(model, graph, optimizer, config, 
+                            name_model='best_model_clasifier.pth'):
+    best_val_loss = float('inf')
+    
+    # Init wandb
+    wandb.init(project='Autoencoder', name=config["run_name"])
+    wandb.watch(model)
+    wandb.config.update(config)
+
+    batch_size = config["batch_size"]
+    for epoch in tqdm(range(1, config["epochs"] + 1)):
+        model.train()
+        epoch_loss = 0
+
+        # # Get the indices to shuffle the embeddings and the labels
+        # num_train_nodes = graph.train_mask.sum().item()
+        # indices = torch.randperm(num_train_nodes)
+        # feat = graph.x[graph.train_mask][indices]
+        # y = graph.y[graph.train_mask][indices]
+        
+        # counter = 0
+        # # Iterating over the embedings and the labels, on batches
+        # for batch in range(0, len(graph.train_mask), batch_size):
+        z1, z2, z3 = model.contrastive(graph)
+
+        #     # Shuffle the embeddings and the labels (Same shuffle)
+        #     z1 = z1[graph.train_mask][indices]
+        #     z2 = z2[graph.train_mask][indices]
+        #     z3 = z3[graph.train_mask][indices]
+            
+        #     z1 = z1[batch:batch+batch_size]
+        #     z2 = z2[batch:batch+batch_size]
+        #     z3 = z3[batch:batch+batch_size]
+
+        #     if len(z1) == 0:
+        #         continue
+
+        loss = model.compute_loss((z1, z2, z3), graph)
+
+        epoch_loss += loss.item()
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+
+        val_loss = 0
+        counter_val = 0
+        model.eval()
+        with torch.no_grad():
+            z1, z2, z3 = model.contrastive(graph)
+            # for batch in range(0, graph.val_mask.sum().item(), batch_size):
+                # z1_b = z1[graph.val_mask][batch:batch+batch_size]
+                # z2_b = z2[graph.val_mask][batch:batch+batch_size]
+                # z3_b = z3[graph.val_mask][batch:batch+batch_size]
+                # if len(z1) == 0:
+                #     continue
+
+            loss = model.compute_loss((z1, z2, z3), graph)
+            val_loss += loss.item()
+                # counter_val += 1
+
+
+
+
+        val_loss = val_loss#/counter_val
+        epoch_loss = epoch_loss#/counter
+        wandb.log({'Train loss': epoch_loss,
+                   'Val loss': val_loss}, step=epoch)
+        
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), name_model)
+            early_stopping_counter = 0
+
+        if config["early_stopping"] == -1:
+            torch.save(model.state_dict(), name_model)
+
+        elif early_stopping_counter > config["early_stopping"]:
+            break
+
+    model.load_state_dict(torch.load(name_model))
+    wandb.finish()
+    return model

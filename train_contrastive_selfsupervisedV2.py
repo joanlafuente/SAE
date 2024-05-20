@@ -22,7 +22,7 @@ import yaml
 import sys
 
 from utils import *
-from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res
+from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAE_model
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

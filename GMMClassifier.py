@@ -12,17 +12,23 @@ from sklearn.metrics import roc_auc_score
 
 
 
-with open('Runs/Supervised/Yelp/Run8_Yelp_2message/embeds_contr_sup_Run8_Yelp_2message.pkl', "rb") as f:
-    embeds = pkl.load(f)
-with open('Runs/Supervised/Yelp/Run8_Yelp_2message/train_test_val_masks_Run8_Yelp_2message.pkl', "rb") as f:
-    train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
-data_file = loadmat('./Data/YelpChi.mat')
-
-# with open('Runs/Supervised/Yelp/Run15_Yelp/embeds_contr_sup_Run15_Yelp.pkl', "rb") as f:
+# with open('Runs/Supervised/Yelp/Run8_Yelp_2message/embeds_contr_sup_Run8_Yelp_2message.pkl', "rb") as f:
 #     embeds = pkl.load(f)
-# with open('Runs/Supervised/Yelp/Run15_Yelp/train_test_val_masks_Run15_Yelp.pkl', "rb") as f:
+# with open('Runs/Supervised/Yelp/Run8_Yelp_2message/train_test_val_masks_Run8_Yelp_2message.pkl', "rb") as f:
 #     train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
 # data_file = loadmat('./Data/YelpChi.mat')
+
+# with open('Runs/Autoencoder/Yelp/Run9_Yelp/Pickles/embeds_contr_sup_Run9_Yelp.pkl', "rb") as f:
+#     embeds = pkl.load(f)
+# with open('Runs/Autoencoder/Yelp/Run9_Yelp/Pickles/train_test_val_masks_Run9_Yelp.pkl', "rb") as f:
+#     train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
+# data_file = loadmat('./Data/YelpChi.mat')
+
+with open('Runs/Supervised/Yelp/Run21_Yelp/embeds_contr_sup_Run21_Yelp.pkl', "rb") as f:
+    embeds = pkl.load(f)
+with open('Runs/Supervised/Yelp/Run21_Yelp/train_test_val_masks_Run21_Yelp.pkl', "rb") as f:
+    train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
+data_file = loadmat('./Data/YelpChi.mat')
 
 # with open('Runs/Supervised/Amazon/Run8_Amz_2message/embeds_contr_sup_Run8_Amz_2message.pkl', "rb") as f:
 #     embeds = pkl.load(f)
@@ -70,7 +76,7 @@ training_labels = np.concatenate([training_labels, val_labels], axis=0)
 # Autoencoder (MLP regressor)
 from sklearn.neural_network import MLPRegressor
 
-mlp = MLPRegressor(hidden_layer_sizes=(1, ), 
+mlp = MLPRegressor(hidden_layer_sizes=(2, ), 
                    solver='adam',
                    activation='identity',
                    random_state=42)
