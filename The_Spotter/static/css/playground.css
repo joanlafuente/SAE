@@ -78,15 +78,10 @@ body {
 
 .graph-container{
   position: absolute;
-  top: 0;  
-  bottom: 0;
-  left: 20%;
-  right: 0%;
-  z-index: 4;
+  top: 10%;  
+  left: 5%;
+  right: 1%;
 }
-
-
-
 
 .close-graph {
   position: absolute;
@@ -97,7 +92,8 @@ body {
   cursor: pointer; /* Cursor style */
   padding: 5px 10px; /* Some padding */
   border: none; /* No border */
-  z-index: 3;
+  z-index: 5;
 }
+
 
 

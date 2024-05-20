@@ -1,6 +1,5 @@
 
 
-
 document.addEventListener("DOMContentLoaded", function () {
   const openBtn = document.getElementById("openbtn");
   const closeBtn = document.getElementById("closebtn");
@@ -20,6 +19,7 @@ document.addEventListener("DOMContentLoaded", function () {
     openBtn.style.display = "block"; // Show the Open Settings button when the sidebar is closed
   });
 });
+
 
 
 
