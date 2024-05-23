@@ -1,6 +1,6 @@
-# Graph-Anomaly-Detection
+# Graph Anomaly Detection
 
-We use two graphs provided by the [CARE-GNN repository](https://github.com/YingtongDou/CARE-GNN?tab=readme-ov-file). 
+We use two graphs provided by [CARE-GNN repository](https://github.com/YingtongDou/CARE-GNN?tab=readme-ov-file). 
 
 [**Amazon graph**](https://paperswithcode.com/dataset/amazon-fraud) is based on amazon users that have done reviews on the instrument category in amazon. Users are nodes in the graph, and there are three types of relations, which are:
   1. **U-P-U** : it connects users reviewing at least one same product
