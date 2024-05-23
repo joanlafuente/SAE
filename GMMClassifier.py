@@ -9,32 +9,63 @@ from tqdm import tqdm
 from sklearn.metrics import average_precision_score
 from sklearn.metrics import classification_report
 from sklearn.metrics import roc_auc_score
+import os
+import sys
+import yaml
 
+# Runs to take into account:
+# Run 17 Yelp Supervised
+# Run 23 Yelp Supervised !!! (Best one) !!!
+# Run 8 2 message Amazon/Yelp Supervised
 
+if len(sys.argv) != 3:
+    raise ValueError('The script needs two arguments: the name of the yaml file and the type of run.\nExample: python GMMClassifier.py name_yaml Supervised\n')
+if sys.argv[2] not in ["Autoencoder", "SelfSupervisedContrastive", "Supervised", "SupervisedContrastive"]:
+    raise ValueError(f'{sys.argv[2]} is not a valid run type. Use Autoencoder, SelfSupervisedContrastive, Supervised or SupervisedContrastive.')
+# Get the name of the yaml file
+name_yaml = sys.argv[1]
+print(f'Running {name_yaml}')
 
-# with open('Runs/Supervised/Yelp/Run8_Yelp_2message/embeds_contr_sup_Run8_Yelp_2message.pkl', "rb") as f:
-#     embeds = pkl.load(f)
-# with open('Runs/Supervised/Yelp/Run8_Yelp_2message/train_test_val_masks_Run8_Yelp_2message.pkl', "rb") as f:
-#     train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
-# data_file = loadmat('./Data/YelpChi.mat')
+# Get the name of the type of run
+run_type = sys.argv[2]
+print(f'Run type: {run_type}')
 
-# with open('Runs/Autoencoder/Yelp/Run9_Yelp/Pickles/embeds_contr_sup_Run9_Yelp.pkl', "rb") as f:
-#     embeds = pkl.load(f)
-# with open('Runs/Autoencoder/Yelp/Run9_Yelp/Pickles/train_test_val_masks_Run9_Yelp.pkl', "rb") as f:
-#     train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
-# data_file = loadmat('./Data/YelpChi.mat')
+# Open a yaml file with the parameters
+with open(f'./Setups/{run_type}/{name_yaml}.yaml') as file:
+    params = yaml.load(file, Loader=yaml.FullLoader)
 
-with open('Runs/Supervised/Yelp/Run21_Yelp/embeds_contr_sup_Run21_Yelp.pkl', "rb") as f:
-    embeds = pkl.load(f)
-with open('Runs/Supervised/Yelp/Run21_Yelp/train_test_val_masks_Run21_Yelp.pkl', "rb") as f:
-    train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
-data_file = loadmat('./Data/YelpChi.mat')
+# Check if data is Amazon or Yelp
+if params["data"] == "amz":
+    run_path = f"./Runs/{run_type}/Amazon/{name_yaml}"
+    data_file = loadmat('./Data/Amazon.mat')
+elif params["data"] == "yelp":
+    run_path = f"./Runs/{run_type}/Yelp/{name_yaml}"
+    data_file = loadmat('./Data/YelpChi.mat')
+else:
+    raise ValueError(f'{params["data"]} is not a valid dataset. Use amz or yelp.')
 
-# with open('Runs/Supervised/Amazon/Run8_Amz_2message/embeds_contr_sup_Run8_Amz_2message.pkl', "rb") as f:
-#     embeds = pkl.load(f)
-# with open('Runs/Supervised/Amazon/Run8_Amz_2message/train_test_val_masks_Run8_Amz_2message.pkl', "rb") as f:
-#     train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
-# data_file = loadmat('./Data/Amazon.mat')
+# Load the embeddings and the masks
+if "Supervised" == run_type:
+    with open(f'{run_path}/embeds_contr_sup_{name_yaml}.pkl', "rb") as f:
+        embeds = pkl.load(f)
+    with open(f'{run_path}/train_test_val_masks_{name_yaml}.pkl', "rb") as f:
+        train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
+elif run_type in ("Autoencoder", "SelfSupervisedContrastive", "SupervisedContrastive"):
+    with open(f'{run_path}/Pickles/embeds_contr_sup_{name_yaml}.pkl', "rb") as f:
+        embeds = pkl.load(f)
+    with open(f'{run_path}/Pickles/train_test_val_masks_{name_yaml}.pkl', "rb") as f:
+        train_mask, val_mask, test_mask = pkl.load(f)
+
+# Create a folder for the GMM plots, results and prediction
+if not os.path.exists(f'{run_path}/GMM'):
+    os.makedirs(f'{run_path}/GMM')
+if not os.path.exists(f'{run_path}/GMM/Plots'):
+    os.makedirs(f'{run_path}/GMM/Plots')
+if not os.path.exists(f'{run_path}/GMM/Results'):
+    os.makedirs(f'{run_path}/GMM/Results')
+if not os.path.exists(f'{run_path}/GMM/Predictions'):
+    os.makedirs(f'{run_path}/GMM/Predictions')
+
 
 labels = data_file['label'].flatten()
 
@@ -46,6 +77,9 @@ val_labels = labels[val_mask]
 # Concatenate the training and validation data
 training_data = np.concatenate([training_data, val_data], axis=0)
 training_labels = np.concatenate([training_labels, val_labels], axis=0)
+
+
+### DIMENSIONALITY REDUCTION ###
 
 # TSNE
 # tsne = TSNE(n_components=2, random_state=42, n_jobs=6, verbose=True)
@@ -76,7 +110,7 @@ training_labels = np.concatenate([training_labels, val_labels], axis=0)
 # Autoencoder (MLP regressor)
 from sklearn.neural_network import MLPRegressor
 
-mlp = MLPRegressor(hidden_layer_sizes=(2, ), 
+mlp = MLPRegressor(hidden_layer_sizes=(1, ), 
                    solver='adam',
                    activation='identity',
                    random_state=42)
@@ -102,29 +136,38 @@ plt.savefig("MLP_Loss.png")
 plt.close()
 
 
-
-
-
-
-
-
+# Plot the features after dimensionality reduction
 if training_data.shape[1] >= 2:
     # Plot the t-SNE of the training data
     plt.scatter(training_data[training_labels == 0][:, 0], training_data[training_labels == 0][:, 1], label='Normal')
     plt.scatter(training_data[training_labels == 1][:, 0], training_data[training_labels == 1][:, 1], label='Anomaly')
     plt.legend()
-    plt.savefig("TSNE_GNN.png")
+    plt.savefig(f"{run_path}/GMM/Plots/dimensionality_reduction.png")
     plt.close()
 elif training_data.shape[1] == 1:
     plt.hist(training_data[training_labels == 1], bins=50, alpha=0.5, label='Anomaly')
     plt.hist(training_data[training_labels == 0], bins=50, alpha=0.5, label='Normal')
     plt.legend()
-    plt.savefig("TSNE_GNN.png")
+    plt.savefig(f"{run_path}/GMM/Plots/dimensionality_reduction.png")
     plt.close()
+    
 
 # Train GMM with embeddings of the non anomal class
 gmm = GaussianMixture(n_components=1, init_params="k-means++" ,random_state=42)
 gmm.fit(training_data[training_labels == 0])
+
+# Plot the GMM density function of the normal class if the data is 1D
+if training_data.shape[1] == 1:
+    x = np.linspace(training_data.min(), training_data.max(), 1000)
+    y = np.exp(gmm.score_samples(x.reshape(-1, 1)))
+    plt.plot(x, y, label="GMM density function")
+    plt.hist(training_data[training_labels == 1], bins=50, alpha=0.5, label='Anomaly', density=True)
+    plt.hist(training_data[training_labels == 0], bins=50, alpha=0.5, label='Normal', density=True)
+    plt.legend()
+    plt.savefig(f"{run_path}/GMM/Plots/dimensionality_reduction_and_GMM.png")
+    plt.close() 
+
+
 
 # Compute the probability of each embedding to be in the GMM of the normal class
 probs = gmm.score_samples(training_data)
@@ -135,7 +178,7 @@ probs = 1 - (1 / (1 + np.exp(probs)))
 plt.hist(probs[training_labels == 1], bins=50, alpha=0.5, label='Anomaly')
 plt.hist(probs[training_labels == 0], bins=50, alpha=0.5, label='Normal')
 plt.legend()
-plt.savefig("GMM_Distribution.png")
+plt.savefig(f"{run_path}/GMM/Plots/GMM_Distribution.png")
 plt.close()
 
 
@@ -164,7 +207,7 @@ plt.xlabel("False Positive Rate")
 plt.ylabel("True Positive Rate")
 plt.title("Receiver operating characteristic")
 plt.legend(loc="lower right")
-plt.savefig("ROC_Curve_GNN.png")
+plt.savefig(f"{run_path}/GMM/Plots/ROC_Curve_GNN.png")
 plt.close()
 
 
@@ -184,7 +227,7 @@ plt.xlabel("Recall")
 plt.ylabel("Precision")
 plt.title("Precision Recall curve")
 plt.legend(loc="lower right")
-plt.savefig("Precision_Recall_Curve_GNN.png")
+plt.savefig(f"{run_path}/GMM/Plots/Precision_Recall_Curve_GNN.png")
 plt.close()
 
 # K-folds cross validation
@@ -197,9 +240,11 @@ best_thresholds = []
 for i, (train_index, test_index) in enumerate(kf.split(probs, y=training_labels)):
     # Get the train and validation data of this split
     X_train2, X_test2 = probs[train_index], probs[test_index]
+    # X_train2, X_test2 = training_data[train_index], training_data[test_index]
     y_train2, y_test2 = training_labels[train_index], training_labels[test_index]
 
     fpr, tpr, thresholds = roc_curve(y_train2, -X_train2)
+    # fpr, tpr, thresholds = roc_curve(y_train2, X_train2)
 
     # Find the best threshold (Nearest to the top left corner)
     best_threshold = -thresholds[np.argmin(np.sqrt(fpr ** 2 + (1 - tpr) ** 2))]
@@ -234,7 +279,7 @@ plt.boxplot(best_thresholds,
             meanline=True, 
             labels=["Treshold positive/negative"])
 plt.ylabel("Treshold value")
-plt.savefig("boxplot_tresholds.png")
+plt.savefig(f"{run_path}/GMM/Plots/boxplot_tresholds.png")
 plt.close()
 
 
@@ -268,7 +313,7 @@ plt.boxplot((precision_neg, recall_neg, f1_neg, precision_pos, recall_pos, f1_po
             labels=["Precision Normal", "Recall Normal", "F1 Normal", "Precision Anomaly", "Recall Anomaly", "F1 Anomaly"])
 plt.ylabel("Metric value")
 plt.ylim(0, 1)
-plt.savefig("boxplot_metrics.png")
+plt.savefig(f"{run_path}/GMM/Plots/boxplot_metrics.png")
 plt.close()
 
 
@@ -290,11 +335,13 @@ test_preds = test_probs < best_threshold
 
 print(classification_report(test_labels, test_preds))
 
+report2save = classification_report(test_labels, test_preds, output_dict=True)
 
 # ROC-AUC
 # roc_auc = roc_auc_score(test_labels, test_data)
 roc_auc = roc_auc_score(test_labels, -test_probs)
 print("ROC-AUC: ", roc_auc)
+report2save["ROC-AUC"] = roc_auc
 
 # ROC curve test
 # fpr, tpr, thresholds = roc_curve(test_labels, test_data)
@@ -316,10 +363,18 @@ plt.xlabel("False Positive Rate")
 plt.ylabel("True Positive Rate")
 plt.title("Receiver operating characteristic test data")
 plt.legend(loc="lower right")
-plt.savefig("ROC_Curve_TEST.png")
+plt.savefig(f"{run_path}/GMM/Plots/ROC_Curve_TEST.png")
 plt.close()
 
 # Average Precision
 # average_precision = average_precision_score(test_labels, test_data)
 average_precision = average_precision_score(test_labels, -test_probs)
 print("Average Precision: ", average_precision)
+report2save["AveragePrecision"] = average_precision
+
+with open(f"{run_path}/GMM/Results/GMM_results.txt", "w") as f:
+    f.write(str(report2save))
+
+# Save test predictions as an .npy
+test_preds = np.array(test_preds, dtype=int)
+np.save(f"{run_path}/GMM/Predictions/test_preds.npy", test_preds)

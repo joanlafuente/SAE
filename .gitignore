@@ -3,6 +3,7 @@
 *.pyc
 *.pth
 *.graphml
+*.log
 amazon_only_label.gexf
 /error_folder/
 /wandb/
