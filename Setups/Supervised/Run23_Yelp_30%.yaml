@@ -1,0 +1,41 @@
+run_name: "Run23_Yelp_30%"
+data: "yelp"
+
+# Training data percentage
+train_data_percentage: 0.3
+
+# Per propagar alhora la loss del triplet i la crossentropy
+ContrastiveAndClassification: True
+weight_triplet: 1
+weight_classification: 1
+
+OnlyEval: False
+
+# If not set uses tsne
+DimReduction: "autoencoder"
+
+
+batch_size: 500
+epochs: 200
+early_stopping: 40
+lr: 0.001
+weight_decay: 0.0001
+
+triplets:
+  mining_margin: 1
+  loss_margin: 1
+
+model_name: "PNA_model"
+model:
+  dropout_PNA: 0.15
+  dropout: 0.3
+  hidden_channels: 40
+  out_channels: 35
+  num_layers: 3
+  in_channels: 32
+
+
+squeduler:
+  type: "StepLR"
+  step_size: 25
+  gamma: 0.65

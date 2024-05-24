@@ -1,0 +1,31 @@
+run_name: "Run23_Amz_sampling"
+data: "amz"
+
+train_contrastive: True
+train_head: True
+
+self_supervised:
+  augmentations: "sampling"
+  percentage_features_not_modified: 0.85
+  percentage_masking_edges: 0.15
+
+batch_size: 1500
+epochs: 500
+early_stopping: 50
+lr: 0.001
+weight_decay: 0.0001
+
+model_name: "PNA_model"
+model:
+  dropout_PNA: 0.15
+  dropout: 0.3
+  hidden_channels: 40
+  out_channels: 35
+  num_layers: 3
+  in_channels: 25
+
+
+squeduler:
+  type: "StepLR"
+  step_size: 25
+  gamma: 0.65

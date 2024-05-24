@@ -40,7 +40,14 @@ with open(f'./Setups/Supervised/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
 if "train_data_percentage" not in params.keys():
-    params["train_data_percentage"] = 0.6 if params["data"] == "amz" else 0.7
+    use_percentage_train = 1
+else:
+    total_train = 0.7 if params["data"] == "yelp" else 0.6
+    use_percentage_train = params["train_data_percentage"] / total_train
+    if use_percentage_train > 1:
+        raise ValueError(f'train_data_percentage cannot be greater than {total_train} for the {params["data"]} dataset')
+
+
 
 if params["data"] == "amz":
     run_path = f"./Runs/Supervised/Amazon/{name_yaml}"
@@ -62,8 +69,13 @@ if params["data"] == "amz":
     train_mask_contrastive = torch.zeros(11944, dtype=torch.bool)
 
     nodes = list(range(3305, 11944))
-    train_nodes, test_val_nodes = train_test_split(nodes, train_size=params["train_data_percentage"], stratify=labels[nodes], random_state=0)
+    train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.6, stratify=labels[nodes], random_state=0)
     val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
+    
+    if use_percentage_train != 1:
+        train_nodes, not_used_nodes = train_test_split(train_nodes, train_size=use_percentage_train, stratify=labels[train_nodes], random_state=0)
+        print(f'Using {use_percentage_train * 0.6 * 100}% of the training data')
+    
     train_nodes_contrastive = train_nodes + list(range(0, 3305))
 
     train_mask[train_nodes] = True
@@ -131,8 +143,11 @@ elif params["data"] == "yelp":
     train_mask_contrastive = torch.zeros(num_nodes, dtype=torch.bool)
 
     nodes = np.arange(num_nodes)
-    train_nodes, test_val_nodes = train_test_split(nodes, train_size=params["train_data_percentage"], stratify=labels, random_state=0)
+    train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.7, stratify=labels, random_state=0)
     val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
+    if use_percentage_train != 1:
+        train_nodes, not_used_nodes = train_test_split(train_nodes, train_size=use_percentage_train, stratify=labels[train_nodes], random_state=0)
+        print(f'Using {use_percentage_train * 0.7 * 100}% of the training data')
     train_nodes_contrastive = train_nodes 
 
     train_mask[train_nodes] = True
