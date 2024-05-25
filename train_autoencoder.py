@@ -21,9 +21,10 @@ import copy
 import os
 import yaml
 import sys
+import pickle as pkl
 
 from utils import *
-from models import GCN_Att_Not_res_Autoencoder, GAE_model, GAE_model_GAT
+from models import GCN_Att_Not_res_Autoencoder, GAE_model, GAE_model_GAT, GAE_model_PNA
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -184,6 +185,8 @@ elif params["model_name"] == 'GAE_model':
     model = GAE_model(**params['model'])
 elif params["model_name"] == 'GAE_model_GAT':
     model = GAE_model_GAT(**params['model'])
+elif params["model_name"] == 'GAE_model_PNA':
+    model = GAE_model_PNA(**params['model'])
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 
@@ -198,6 +201,12 @@ if "train_edge_autoencoder" in params and params["train_edge_autoencoder"]:
     model = train_autoencoder_edges(model, graph, optimizer_gcn, 
                                     config=params,
                                     name_model=f'{run_path}/Weights/contr_sup_{name_yaml}.pth')
+
+    # Frozing all the model parameters that are not on the classification head
+    for name, param in model.named_parameters():
+        if 'GAE' in name:
+            print("Frozing", name)
+            param.requires_grad = False
     
     parameters = filter(lambda p: p.requires_grad, model.parameters())
 
@@ -220,10 +229,10 @@ if "train_edge_autoencoder" in params and params["train_edge_autoencoder"]:
         labels = graph.y.cpu().numpy()
 
     # Save the embeddings
-    with open(f'{run_path}/embeds_contr_sup_{name_yaml}.pkl', 'wb') as file:
+    with open(f'{run_path}/Pickles/embeds_contr_sup_{name_yaml}.pkl', 'wb') as file:
         pkl.dump(out, file)
 
-    with open(f"{run_path}/train_test_val_masks_{name_yaml}.pkl", "wb") as file:
+    with open(f"{run_path}/Pickles/train_test_val_masks_{name_yaml}.pkl", "wb") as file:
         pkl.dump([train_mask, val_mask, test_mask, train_mask_contrastive], file)
 
     from sklearn.neural_network import MLPRegressor
@@ -329,12 +338,24 @@ if ("getEmbeds" in params and params["getEmbeds"]) and not ("train_edge_autoenco
 
     out = out.cpu().numpy()
     # Save the embeddings
-    import pickle as pkl
     with open(f'{run_path}/Pickles/embeds_contr_sup_{name_yaml}.pkl', 'wb') as file:
         pkl.dump(out, file)
 
     with open(f"{run_path}/Pickles/train_test_val_masks_{name_yaml}.pkl", "wb") as file:
         pkl.dump([train_mask, val_mask, test_mask, train_mask_contrastive], file)
+
+elif ("getEmbeds" in params and params["getEmbeds"]) and ("train_edge_autoencoder" in params):
+    model.load_state_dict(torch.load(f'{run_path}/Weights/cls_sup_{name_yaml}.pth', map_location=device))
+    # Get the embeddings of the nodes
+    model.eval()
+    with torch.no_grad():
+        out = model.encode(graph)
+        out = out.cpu().numpy()
+        labels = graph.y.cpu().numpy()
+
+    # Save the embeddings
+    with open(f'{run_path}/Pickles/embeds_contr_sup_{name_yaml}.pkl', 'wb') as file:
+        pkl.dump(out, file)
 
 
 if params["searchBestTreshold"]:

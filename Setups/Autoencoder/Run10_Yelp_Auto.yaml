@@ -1,4 +1,4 @@
-run_name: "Run10_Yelp_Auto"
+run_name: "Run11_Yelp_Auto"
 data: "yelp"
 
 train_edge_autoencoder: True

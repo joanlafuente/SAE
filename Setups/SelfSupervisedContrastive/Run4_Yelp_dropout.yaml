@@ -1,0 +1,32 @@
+run_name: "Run4_Yelp_dropout"
+data: "yelp"
+
+train_contrastive: True
+train_head: True
+
+self_supervised:
+  augmentations: "dropout"
+  percentage_masking_features: 0.1
+  percentage_masking_edges: 0.1
+
+batch_size: 1500
+epochs: 500
+early_stopping: 50
+lr: 0.001
+weight_decay: 0.0001
+
+
+model_name: "PNA_model_self_supervised"
+model:
+  dropout_PNA: 0.0
+  dropout: 0.3
+  hidden_channels: 10
+  out_channels: 3
+  num_layers: 3
+  in_channels: 32
+
+
+squeduler:
+  type: "StepLR"
+  step_size: 25
+  gamma: 0.65

@@ -22,7 +22,7 @@ import yaml
 import sys
 
 from utils import *
-from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAE_model, PNA_model
+from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAE_model, PNA_model, PNA_model_self_supervised
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -190,6 +190,8 @@ elif params["model_name"] == 'GCN_Att_Not_res':
     model = GCN_Att_Not_res(**params['model'])
 elif params["model_name"] == 'PNA_model':
     model = PNA_model(**params['model'])
+elif params["model_name"] == 'PNA_model_self_supervised':
+    model = PNA_model_self_supervised(**params['model'])
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 

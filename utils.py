@@ -11,7 +11,7 @@ import numpy as np
 from tqdm import tqdm
 import random
 
-from sklearn.metrics import confusion_matrix, roc_auc_score, f1_score, roc_curve
+from sklearn.metrics import confusion_matrix, roc_auc_score, f1_score, roc_curve, average_precision_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 import copy
@@ -47,6 +47,18 @@ def compute_ROC_AUC(model, graph, mask):
         pred = pred.cpu().numpy()
         labels = labels.cpu().numpy()
         return roc_auc_score(labels, pred)#, multi_class='ovr', average='micro')
+    
+def compute_Average_Precision(model, graph, mask):
+    model.eval()
+    with torch.no_grad():
+        pred = model(graph)[mask]
+        labels = graph.y[mask]
+        pred = F.softmax(pred, dim=1)
+        # Get the probabilities of the positive class
+        pred = pred[:, 1]
+        pred = pred.cpu().numpy()
+        labels = labels.cpu().numpy()
+        return average_precision_score(labels, pred)
 
 def eval_node_classifier(model, graph, mask):
 
@@ -735,30 +747,10 @@ def train_autoencoder_edges(model, graph, optimizer, config,
         model.train()
         epoch_loss = 0
 
-        # # Get the indices to shuffle the embeddings and the labels
-        # num_train_nodes = graph.train_mask.sum().item()
-        # indices = torch.randperm(num_train_nodes)
-        # feat = graph.x[graph.train_mask][indices]
-        # y = graph.y[graph.train_mask][indices]
-        
-        # counter = 0
-        # # Iterating over the embedings and the labels, on batches
-        # for batch in range(0, len(graph.train_mask), batch_size):
         z1, z2, z3 = model.contrastive(graph)
 
-        #     # Shuffle the embeddings and the labels (Same shuffle)
-        #     z1 = z1[graph.train_mask][indices]
-        #     z2 = z2[graph.train_mask][indices]
-        #     z3 = z3[graph.train_mask][indices]
-            
-        #     z1 = z1[batch:batch+batch_size]
-        #     z2 = z2[batch:batch+batch_size]
-        #     z3 = z3[batch:batch+batch_size]
 
-        #     if len(z1) == 0:
-        #         continue
-
-        loss = model.compute_loss((z1, z2, z3), graph)
+        loss = model.compute_loss((z1, z2, z3), graph, graph.train_mask_contrastive)
 
         epoch_loss += loss.item()
         loss.backward()
@@ -770,14 +762,8 @@ def train_autoencoder_edges(model, graph, optimizer, config,
         model.eval()
         with torch.no_grad():
             z1, z2, z3 = model.contrastive(graph)
-            # for batch in range(0, graph.val_mask.sum().item(), batch_size):
-                # z1_b = z1[graph.val_mask][batch:batch+batch_size]
-                # z2_b = z2[graph.val_mask][batch:batch+batch_size]
-                # z3_b = z3[graph.val_mask][batch:batch+batch_size]
-                # if len(z1) == 0:
-                #     continue
 
-            loss = model.compute_loss((z1, z2, z3), graph)
+            loss = model.compute_loss((z1, z2, z3), graph, graph.val_mask)
             val_loss += loss.item()
                 # counter_val += 1
 

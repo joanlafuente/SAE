@@ -1330,9 +1330,32 @@ class GAE_model_GAT(torch.nn.Module):
         z3 = self.z3_proj(x3)
         return (z1, z2, z3)
     
-    def compute_loss(self, z, data):
+    def compute_loss(self, z, data, mask=None):
         z1, z2, z3 = z 
-        pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p, data.edge_index_s, data.edge_index_v
+
+        if mask is not None:
+            # Set to zero the z embeddings of the nodes that are not in mask
+            inverted_mask = torch.ones(data.x.size(0), dtype=bool)
+            inverted_mask[mask] = False
+            z1[inverted_mask], z2[inverted_mask], z3[inverted_mask] = 0, 0, 0
+
+            # Remove the edges that connect to nodes in the mask
+            mask_pos_edge1 = torch.ones(data.edge_index_p.size(1), dtype=bool)
+            mask_pos_edge1[mask[data.edge_index_p[0]]] = False
+            mask_pos_edge1[mask[data.edge_index_p[1]]] = False
+
+            mask_pos_edge2 = torch.ones(data.edge_index_s.size(1), dtype=bool)
+            mask_pos_edge2[mask[data.edge_index_s[0]]] = False
+            mask_pos_edge2[mask[data.edge_index_s[1]]] = False
+
+            mask_pos_edge3 = torch.ones(data.edge_index_v.size(1), dtype=bool)
+            mask_pos_edge3[mask[data.edge_index_v[0]]] = False
+            mask_pos_edge3[mask[data.edge_index_v[1]]] = False
+            
+            pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p[:, mask_pos_edge1], data.edge_index_s[:, mask_pos_edge2], data.edge_index_v[:, mask_pos_edge3]
+        
+        else:
+            pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p, data.edge_index_s, data.edge_index_v
 
         if "neg_edge_index_p" in data and data.count < 20:
             neg_edge1, neg_edge2, neg_edge3 = data.neg_edge_index_p, data.neg_edge_index_s, data.neg_edge_index_v
@@ -1673,3 +1696,278 @@ class PNA_model_2(torch.nn.Module):
         x = self.classifier(x)
         return x
     
+
+class PNA_model_self_supervised(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_PNA=0):
+        super().__init__()
+        self.activation = nn.Tanh()
+        self.in_norm = nn.BatchNorm1d(in_channels)
+        self.p_norm = nn.BatchNorm1d(out_channels)
+        self.s_norm = nn.BatchNorm1d(out_channels)
+        self.v_norm = nn.BatchNorm1d(out_channels)
+
+
+        aggregators = ['mean', 'mean', 'mean']
+        scalers = ['identity', 'identity', 'identity']
+        deg = torch.tensor([2, 2, 2])
+
+        self.gin_p = PNA(in_channels=in_channels, 
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+        self.gin_s = PNA(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+        
+        self.gin_v = PNA(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+
+        self.attention = SelfAttention2(in_channels, out_channels, out_channels)
+
+        self.projection = nn.Sequential(nn.Tanh(),
+                                        nn.Dropout(dropout),
+                                        nn.Linear(out_channels, in_channels))
+
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(out_channels, int(out_channels*2/3)),
+            nn.BatchNorm1d(int(out_channels*2/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*2/3), int(out_channels*1/3)),
+            nn.BatchNorm1d(int(out_channels*1/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*1/3), 2),
+        )
+
+    # Function to load the weights of the model (for perviouly trained models)
+    def load_state_dict(self, state_dict):
+        if 'attention.scoringDot.fc_q.weight' not in state_dict:
+            state_dict['attention.scoringDot.fc_q.weight'] = state_dict['attention.fc_q.weight']
+            state_dict['attention.scoringDot.fc_q.bias'] = state_dict['attention.fc_q.bias']
+
+            state_dict['attention.scoringDot.fc_k.weight'] = state_dict['attention.fc_k.weight']
+            state_dict['attention.scoringDot.fc_k.bias'] = state_dict['attention.fc_k.bias']
+
+            state_dict['attention.scoringDot.fc_v.weight'] = state_dict['attention.fc_v.weight']
+            state_dict['attention.scoringDot.fc_v.bias'] = state_dict['attention.fc_v.bias']
+            super().load_state_dict(state_dict)
+
+        else:
+            super().load_state_dict(state_dict)
+
+    def encode(self, data):
+        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
+        x = self.in_norm(x)
+
+        x_p = self.gin_p(x, edge_index_p)
+        x_p = self.p_norm(x_p)
+        x_p = self.activation(x_p)
+
+        x_s = self.gin_s(x, edge_index_s)
+        x_s = self.s_norm(x_s)
+        x_s = self.activation(x_s)
+
+        x_v = self.gin_v(x, edge_index_v)
+        x_v = self.v_norm(x_v)
+        x_v = self.activation(x_v)
+
+        # Concate the embeddings (batch, 3, out_channels)
+        x_embed = torch.cat((x_p.unsqueeze(1), x_s.unsqueeze(1), x_v.unsqueeze(1)), 1)
+
+        # Apply attention mechanism
+        x = self.attention(x_embed, x)
+        return x
+
+    def contrastive(self, data):
+        x = self.encode(data)
+        x = self.projection(x)
+        return x
+
+    def forward(self, data):
+        x = self.encode(data)
+        x = self.classifier(x)
+        return x
+
+
+class GAE_encoder_PNA(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_PNA=0):
+        super().__init__()
+        self.activation = nn.Tanh()
+        self.in_norm = nn.BatchNorm1d(in_channels)
+        self.p_norm = nn.BatchNorm1d(out_channels)
+        self.s_norm = nn.BatchNorm1d(out_channels)
+        self.v_norm = nn.BatchNorm1d(out_channels)
+
+        aggregators = ['mean', 'mean', 'std', 'max']
+        scalers = ['amplification', 'amplification', 'amplification', 'identity']
+        deg = torch.tensor([1, 1, 1, 1])
+
+        self.PNA_p = PNA(in_channels=in_channels, 
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+        self.PNA_s = PNA(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+        
+        self.PNA_v = PNA(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+
+    def forward(self, data):
+        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
+        x = self.in_norm(x)
+
+        x_p = self.PNA_p(x, edge_index_p)
+        x_p = self.p_norm(x_p)
+        x_p = self.activation(x_p)
+
+        x_s = self.PNA_s(x, edge_index_s)
+        x_s = self.s_norm(x_s)
+        x_s = self.activation(x_s)
+
+        x_v = self.PNA_v(x, edge_index_v)
+        x_v = self.v_norm(x_v)
+        x_v = self.activation(x_v)
+
+        return (x_p, x_s, x_v)
+    
+
+class GAE_model_PNA(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_PNA=0):
+        super().__init__()
+        
+        self.encoder = GAE_encoder_PNA(dropout, hidden_channels, out_channels, num_layers, in_channels, dropout_PNA)
+
+        self.z1_proj = nn.Sequential(nn.Linear(out_channels, out_channels),
+                                     nn.BatchNorm1d(out_channels),
+                                     nn.Tanh(),
+                                     nn.Linear(out_channels, out_channels))
+        
+        self.z2_proj = nn.Sequential(nn.Linear(out_channels, out_channels),
+                                     nn.BatchNorm1d(out_channels),
+                                     nn.Tanh(),
+                                     nn.Linear(out_channels, out_channels))
+        
+        self.z3_proj = nn.Sequential(nn.Linear(out_channels, out_channels),
+                                     nn.BatchNorm1d(out_channels),
+                                     nn.Tanh(),
+                                     nn.Linear(out_channels, out_channels))
+
+        self.GAE = GAE(encoder=self.encoder)
+
+        self.attention = SelfAttention2(in_channels, out_channels, out_channels)
+
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(out_channels, int(out_channels*2/3)),
+            nn.BatchNorm1d(int(out_channels*2/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*2/3), int(out_channels*1/3)),
+            nn.BatchNorm1d(int(out_channels*1/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*1/3), 2),
+        )
+    
+    def contrastive(self, data):
+        x1, x2, x3 = self.GAE.encode(data)
+        
+        z1 = self.z1_proj(x1)
+        z2 = self.z2_proj(x2)
+        z3 = self.z3_proj(x3)
+        return (z1, z2, z3)
+    
+    def compute_loss(self, z, data, mask=None):
+        z1, z2, z3 = z 
+
+        if mask is not None:
+            # Set to zero the z embeddings of the nodes that are not in mask
+            inverted_mask = torch.ones(data.x.size(0), dtype=bool)
+            inverted_mask[mask] = False
+            z1[inverted_mask], z2[inverted_mask], z3[inverted_mask] = 0, 0, 0
+
+            # Remove the edges that connect to nodes in the mask
+            mask_pos_edge1 = torch.ones(data.edge_index_p.size(1), dtype=bool)
+            mask_pos_edge1[mask[data.edge_index_p[0]]] = False
+            mask_pos_edge1[mask[data.edge_index_p[1]]] = False
+
+            mask_pos_edge2 = torch.ones(data.edge_index_s.size(1), dtype=bool)
+            mask_pos_edge2[mask[data.edge_index_s[0]]] = False
+            mask_pos_edge2[mask[data.edge_index_s[1]]] = False
+
+            mask_pos_edge3 = torch.ones(data.edge_index_v.size(1), dtype=bool)
+            mask_pos_edge3[mask[data.edge_index_v[0]]] = False
+            mask_pos_edge3[mask[data.edge_index_v[1]]] = False
+            
+            pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p[:, mask_pos_edge1], data.edge_index_s[:, mask_pos_edge2], data.edge_index_v[:, mask_pos_edge3]
+        
+        else:
+            pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p, data.edge_index_s, data.edge_index_v
+
+        if "neg_edge_index_p" in data and data.count < 20:
+            neg_edge1, neg_edge2, neg_edge3 = data.neg_edge_index_p, data.neg_edge_index_s, data.neg_edge_index_v
+            data.count += 1
+        else:
+            neg_edge1 = negative_sampling(pos_edge1, z1.size(0), method="dense")
+            neg_edge2 = negative_sampling(pos_edge2, z2.size(0), method="dense")
+            neg_edge3 = negative_sampling(pos_edge3, z3.size(0), method="dense")
+
+            data.neg_edge_index_p = neg_edge1
+            data.neg_edge_index_s = neg_edge2
+            data.neg_edge_index_v = neg_edge3
+            data.count = 0
+    
+        return self.GAE.recon_loss(z1, pos_edge1, neg_edge1) + self.GAE.recon_loss(z2, pos_edge2, neg_edge2) + self.GAE.recon_loss(z3, pos_edge3, neg_edge3)
+
+    def encode(self, data):
+        x1, x2, x3 = self.GAE.encode(data)
+        # Concate the embeddings (batch, 3, out_channels)
+        x_embed = torch.cat((x1.unsqueeze(1), x2.unsqueeze(1), x3.unsqueeze(1)), 1)
+        # Apply attention mechanism
+        x = self.attention(x_embed, data.x)
+        return x
+    
+    def forward(self, data):
+        x = self.encode(data)
+        x = self.classifier(x)
+        return x

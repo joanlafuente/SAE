@@ -359,7 +359,7 @@ report = classification_report(graph.y[graph.test_mask].cpu().numpy(), predictio
 
 
 report["ROC_AUC"] = compute_ROC_AUC(model, graph, graph.test_mask)
-
+report["AP"] = compute_Average_Precision(model, graph, graph.test_mask)
 
 
 fpr, tpr = compute_ROC_curve(model, graph, graph.test_mask)
