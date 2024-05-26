@@ -204,7 +204,7 @@ if "train_edge_autoencoder" in params and params["train_edge_autoencoder"]:
 
     # Frozing all the model parameters that are not on the classification head
     for name, param in model.named_parameters():
-        if 'GAE' in name:
+        if 'encoder' in name:
             print("Frozing", name)
             param.requires_grad = False
     

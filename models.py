@@ -1971,3 +1971,11 @@ class GAE_model_PNA(torch.nn.Module):
         x = self.encode(data)
         x = self.classifier(x)
         return x
+
+if __name__ == "__main__":
+    model = GAE_model_PNA()
+    for name, param in model.named_parameters():
+        if "encoder" in name:
+            print(name)
+            print(param.shape)
+            print("\n")
