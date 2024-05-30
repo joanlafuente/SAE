@@ -1145,8 +1145,6 @@ class GAE_encoder(torch.nn.Module):
                         dropout=dropout_GIN,
                         )
 
-        self.attention = SelfAttention(in_channels, out_channels, out_channels)
-
     def forward(self, data):
         x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
         x = self.in_norm(x)
@@ -1163,13 +1161,7 @@ class GAE_encoder(torch.nn.Module):
         x_v = self.v_norm(x_v)
         x_v = self.activation(x_v)
 
-        # Concate the embeddings (batch, 3, out_channels)
-        x_embed = torch.cat((x_p.unsqueeze(1), x_s.unsqueeze(1), x_v.unsqueeze(1)), 1)
-
-        # Apply attention mechanism
-        x = self.attention(x_embed, x)
-
-        return x
+        return (x_p, x_s, x_v)
 
 
 class GAE_model(torch.nn.Module):
@@ -1195,6 +1187,8 @@ class GAE_model(torch.nn.Module):
 
         self.GAE = GAE(encoder=self.encoder)
 
+        self.attention = SelfAttention2(in_channels, out_channels, out_channels)
+
         self.classifier = nn.Sequential(
             nn.Dropout(dropout),
             nn.Linear(out_channels, int(out_channels*2/3)),
@@ -1209,16 +1203,39 @@ class GAE_model(torch.nn.Module):
         )
     
     def contrastive(self, data):
-        x = self.GAE.encode(data)
+        x1, x2, x3 = self.GAE.encode(data)
         
-        z1 = self.z1_proj(x)
-        z2 = self.z2_proj(x)
-        z3 = self.z3_proj(x)
+        z1 = self.z1_proj(x1)
+        z2 = self.z2_proj(x2)
+        z3 = self.z3_proj(x3)
         return (z1, z2, z3)
     
-    def compute_loss(self, z, data):
+    def compute_loss(self, z, data, mask=None):
         z1, z2, z3 = z 
-        pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p, data.edge_index_s, data.edge_index_v
+
+        if mask is not None:
+            # Set to zero the z embeddings of the nodes that are not in mask
+            inverted_mask = torch.ones(data.x.size(0), dtype=bool)
+            inverted_mask[mask] = False
+            z1[inverted_mask], z2[inverted_mask], z3[inverted_mask] = 0, 0, 0
+
+            # Remove the edges that connect to nodes in the mask
+            mask_pos_edge1 = torch.ones(data.edge_index_p.size(1), dtype=bool)
+            mask_pos_edge1[mask[data.edge_index_p[0]]] = False
+            mask_pos_edge1[mask[data.edge_index_p[1]]] = False
+
+            mask_pos_edge2 = torch.ones(data.edge_index_s.size(1), dtype=bool)
+            mask_pos_edge2[mask[data.edge_index_s[0]]] = False
+            mask_pos_edge2[mask[data.edge_index_s[1]]] = False
+
+            mask_pos_edge3 = torch.ones(data.edge_index_v.size(1), dtype=bool)
+            mask_pos_edge3[mask[data.edge_index_v[0]]] = False
+            mask_pos_edge3[mask[data.edge_index_v[1]]] = False
+            
+            pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p[:, mask_pos_edge1], data.edge_index_s[:, mask_pos_edge2], data.edge_index_v[:, mask_pos_edge3]
+        
+        else:
+            pos_edge1, pos_edge2, pos_edge3 = data.edge_index_p, data.edge_index_s, data.edge_index_v
 
         if "neg_edge_index_p" in data and data.count < 20:
             neg_edge1, neg_edge2, neg_edge3 = data.neg_edge_index_p, data.neg_edge_index_s, data.neg_edge_index_v
@@ -1235,8 +1252,18 @@ class GAE_model(torch.nn.Module):
     
         return self.GAE.recon_loss(z1, pos_edge1, neg_edge1) + self.GAE.recon_loss(z2, pos_edge2, neg_edge2) + self.GAE.recon_loss(z3, pos_edge3, neg_edge3)
 
+    def encode(self, data):
+        x1, x2, x3 = self.GAE.encode(data)
+        # Concate the embeddings (batch, 3, out_channels)
+        x_embed = torch.cat((x1.unsqueeze(1), x2.unsqueeze(1), x3.unsqueeze(1)), 1)
+        # Apply attention mechanism
+        x = self.attention(x_embed, data.x)
+        return x
+    
     def forward(self, data):
-        return self.GAE.encode(data)
+        x = self.encode(data)
+        x = self.classifier(x)
+        return x
     
 
 
@@ -1971,11 +1998,3 @@ class GAE_model_PNA(torch.nn.Module):
         x = self.encode(data)
         x = self.classifier(x)
         return x
-
-if __name__ == "__main__":
-    model = GAE_model_PNA()
-    for name, param in model.named_parameters():
-        if "encoder" in name:
-            print(name)
-            print(param.shape)
-            print("\n")

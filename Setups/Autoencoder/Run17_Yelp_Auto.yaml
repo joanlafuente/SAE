@@ -1,0 +1,29 @@
+run_name: "Run17_Yelp_Auto"
+data: "yelp"
+
+train_edge_autoencoder: True
+train_autoencoder: False
+searchBestTreshold: False
+getEmbeds: False
+
+batch_size: 1500
+epochs: 250
+early_stopping: 60
+lr: 0.001
+weight_decay: 0.0001
+
+
+model_name: "GAE_model"
+model:
+  dropout_GIN: 0.03
+  dropout: 0.35
+  hidden_channels: 60
+  out_channels: 50
+  num_layers: 2
+  in_channels: 32
+
+
+squeduler:
+  type: "StepLR"
+  step_size: 25
+  gamma: 0.5

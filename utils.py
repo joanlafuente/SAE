@@ -11,7 +11,7 @@ import numpy as np
 from tqdm import tqdm
 import random
 
-from sklearn.metrics import confusion_matrix, roc_auc_score, f1_score, roc_curve, average_precision_score
+from sklearn.metrics import confusion_matrix, roc_auc_score, f1_score, roc_curve, average_precision_score, precision_recall_curve
 import matplotlib.pyplot as plt
 import seaborn as sns
 import copy
@@ -35,6 +35,19 @@ def compute_ROC_curve(model, graph, mask):
         fpr, tpr, _ = roc_curve(labels, pred)
     
     return fpr, tpr
+
+def compute_PR_curve(model, graph, mask):
+    model.eval()
+    with torch.no_grad():
+        pred = model(graph)[mask]
+        labels = graph.y[mask]
+        pred = F.softmax(pred, dim=1)
+        # Get the probabilities of the positive class
+        pred = pred[:, 1]
+        pred = pred.cpu().numpy()
+        labels = labels.cpu().numpy()
+        precision, recall, _ = precision_recall_curve(labels, pred)
+    return precision, recall
 
 def compute_ROC_AUC(model, graph, mask):
     model.eval()

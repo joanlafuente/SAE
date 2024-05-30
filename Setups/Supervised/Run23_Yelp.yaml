@@ -7,6 +7,7 @@ weight_triplet: 1
 weight_classification: 1
 
 OnlyEval: False
+GenerateTSNE: True
 
 # If not set uses tsne
 DimReduction: "autoencoder"

@@ -42,7 +42,7 @@ data = pd.DataFrame(feat_data[3305:, :], columns=[f'feature_{i}' for i in range(
 data['target'] = labels[3305:]
 
 # Splitting the data into training and testing dataset
-train_data, test_data = train_test_split(data, test_size=0.2, random_state=42, stratify=data['target'])
+train_data, test_data = train_test_split(data, train_size=0.7, random_state=0, stratify=data['target'])
 
 # Setup PyCaret - target column is 'target'
 clf1 = setup(data=train_data, target='target', session_id=42, use_gpu=True)

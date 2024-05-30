@@ -24,7 +24,7 @@ import os
 import sys
 
 from utils import *
-from models import GCN, Simpler_GCN, Simpler_GCN2, Simpler_GCN_Conv, GCN_Att, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat, GAT_BatchNormalitzation, GAT_SELU_Alphadrop, GIN_ReLU, GIN_tanh, GraphSAGE_model, PNA_model, PNA_model_2
+from models import GCN, GAE_model, GAE_model_PNA, Simpler_GCN, Simpler_GCN2, Simpler_GCN_Conv, GCN_Att, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat, GAT_BatchNormalitzation, GAT_SELU_Alphadrop, GIN_ReLU, GIN_tanh, GraphSAGE_model, PNA_model, PNA_model_2
 import yaml
 
 
@@ -216,6 +216,10 @@ elif params["model_name"] == 'PNA_model':
     model = PNA_model(**params['model'])
 elif params["model_name"] == 'PNA_model_2':
     model = PNA_model_2(**params['model'])
+elif params["model_name"] == 'GAE_model_PNA':
+    model = GAE_model_PNA(**params['model'])
+elif params["model_name"] == 'GAE_model':
+    model = GAE_model(**params['model'])
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 
@@ -223,7 +227,7 @@ else:
 if os.path.exists(f'{run_path}/Weights/cls_sup_{name_yaml}.pth'):
     model.load_state_dict(torch.load(f'{run_path}/Weights/cls_sup_{name_yaml}.pth', map_location=device))
 elif os.path.exists(f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth'):
-    model.load_state_dict(torch.load(f'{run_path}/Weights/cls_sup_{name_yaml}.pth', map_location=device))
+    model.load_state_dict(torch.load(f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth', map_location=device))
 else:
     raise ValueError(f'The model {name_yaml} does not exist or has not a classification head trained.\nTrain the model first or if is the case use the GMM classifier.')
 
