@@ -5,23 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Spotter</title>
   <link rel="stylesheet" href="../static/css/about.css">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="container"></div>
   <canvas class="background"></canvas> <!-- Add canvas element -->
-  <div class="grey_square"></div> <!-- Add overlay element -->
-  <div class="black_square"></div> <!-- Add overlay element -->
+  <div class="grey_square overlay"></div> <!-- Add overlay element -->
+  <div class="black_square overlay"></div> <!-- Add overlay element -->
   <div class="About_us">About Us</div> <!-- Add title element -->
   <div class="description">
-    <p>We are a group of students at the Universitat Autònoma de Barcelona (UAB) that have designed this interactive tool in a form of a WebApp to explore and detect anomalous nodes in an Amazon dataset about user reviews. The web consist on an interactive playground where the user can select some filters to filter the graph and obtain a subgraph of the original graph. Also the user can choose froma variety of models when it comes to detecting anomalous nodes. The anomalus nodes will be represented in red along with its confidence metric of each node and the whole graph. </p>
-    To start using the webb app, simply create an account with a password in the create account page and you will be redirected to the playground where when the user uploads the dataset will be able to play around with the filtters and different models.
+    <p>We are a group of students at the Universitat Autònoma de Barcelona (UAB) that have designed this interactive tool in a form of a WebApp to explore and detect anomalous nodes in an Amazon and Yelp datasets about user reviews. The web consist on an interactive playground where the user can select some filters to filter the graph and obtain a subgraph of the original graph. Also the user can choose froma variety of models when it comes to detecting anomalous nodes. The anomalus nodes will be represented in red along with its confidence metric of each node and the whole graph. </p>
+    To start using the webb app, simply go to the playground, open the settings tab and upload a model, then the user can start filtering the graph and detecting anomalies.
     <!-- Add your project description here -->
   </div>
   <div class="The_Spotter"><span class="bolded">The Spotter</span></div> <!-- Add subtitle element -->
-  <a href="about_us.html" class="about_us-link"><u>About Us</u></a>
-  <a href="index.html" class="home-link">Home</a>
-  <a href="create_acc.html" class="create_acc-link">Create Account</a>
-  <a href="log_in.html" class="log_in-link">Log In</a>
+  <a href="about_us.html" class="about_us-link nav-link"><u>About Us</u></a>
+  <a href="index.html" class="home-link nav-link">Home</a>
+  <a href="playground.html" class="log_in-link nav-link">Playground</a>
+  <a href="https://github.com/joanlafuente/Graph-Anomaly-Detection" target="_blank" rel="noopener noreferrer" class="github-button">
+    <img src="../static/images/githubi.png" alt="GitHub Repository" class="github-logo">
+  </a>
   <script src="../static/js/node_modules/particlesjs/dist/particles.min.js"></script> <!-- Include particles.js -->
   <script src="../static/js/script.js"></script>
 </body>

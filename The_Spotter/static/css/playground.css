@@ -1,50 +1,47 @@
-
 body {
   margin: 0;
   padding: 0;
+  font-family: Arial, sans-serif;
 }
 
 .sidebar {
   height: 100%;
   width: 0;
   position: fixed;
-  z-index: 1;
+  z-index: 3;
   top: 0;
   left: 0;
-  background-color: #111;
+  background-color: #333;
   overflow-x: hidden;
   padding-top: 60px;
   transition: 0.5s;
-  
 }
+
 .sidebar .title {
-  color: white;
-  font-size: 20px;
+  color: #fff;
+  font-size: 24px;
   font-weight: bold;
   padding: 10px;
- 
 }
+
 .sidebar .text {
-  color: rgba(159, 159, 159, 0.767);
-  font-size: 20px;
+  color: #ccc;
+  font-size: 18px;
   font-weight: bold;
   padding: 10px;
-  
 }
 
 .sidebar a {
   padding: 8px 8px 8px 32px;
   text-decoration: none;
-  font-size: 25px;
-  color: #818181;
+  font-size: 20px;
+  color: #ccc;
   display: block;
   transition: 0.3s;
-  
 }
 
 .sidebar a:hover {
-  color: #f1f1f1;
-  
+  color: #fff;
 }
 
 .sidebar .closebtn {
@@ -53,22 +50,21 @@ body {
   right: 25px;
   font-size: 36px;
   margin-left: 50px;
-  
+  color: #fff;
 }
 
 .openbtn {
   font-size: 20px;
   cursor: pointer;
-  background-color: #111;
-  color: white;
+  background-color: #333;
+  color: #fff;
   padding: 10px 15px;
   border: none;
- 
+  transition: 0.3s;
 }
 
 .openbtn:hover {
   background-color: #444;
-  
 }
 
 #main {
@@ -76,24 +72,53 @@ body {
   padding: 20px;
 }
 
-.graph-container{
+.graph-container {
   position: absolute;
-  top: 10%;  
+  top: 15%;
   left: 5%;
-  right: 1%;
+  right: 5%;
+  bottom: 1%;
+  border: 1px solid #ccc;
+  padding: 10px;
+  z-index: 2;
+  display: none; /* Initially hidden */
 }
 
 .close-graph {
   position: absolute;
   top: 0;
   right: 0;
-  background-color: #f44336; /* Red background */
-  color: white; /* White text */
-  cursor: pointer; /* Cursor style */
-  padding: 5px 10px; /* Some padding */
-  border: none; /* No border */
+  background-color: #f44336;
+  color: #fff;
+  cursor: pointer;
+  padding: 5px 10px;
+  border: none;
   z-index: 5;
+  transition: 0.3s;
 }
 
+.close-graph:hover {
+  background-color: #f00;
+}
 
+.homebtn {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background-color: #0c0c0c; /* Primary blue color */
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px; /* Rounded corners */
+  cursor: pointer;
+  z-index: 4;
+  transition: background-color 0.3s, transform 0.3s;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  font-size: 16px; /* Slightly larger font size */
+}
+
+.homebtn:hover {
+  background-color: #000000; /* Darker blue on hover */
+  transform: translateY(-2px); /* Slight lift effect on hover */
+}
 

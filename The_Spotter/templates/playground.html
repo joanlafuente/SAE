@@ -12,22 +12,27 @@
     <span class="title">The Spotter</span>
     <hr>
     <div class="text">Upload Graph</div>
-    <button onclick="displayGraph()" class="btn">Display Amazon Graph</button> <!-- New button -->
-    <button onclick="displayGraph2()" class="btn">Display Yelp Graph</button> <!-- Button for graph 2 -->
-    <div class="text">Filters</div>
+    <button onclick="displayGraph()" class="btn">Display Amazon Graph</button>
+    <button onclick="displayGraph2()" class="btn">Display Yelp Graph</button>
+    <div class="text">Models</div>
+    <button onclick="Filter1()" class="btn">Supervised</button>
+    <button onclick="Filter2()" class="btn">Autoencoders</button>
+    <button onclick="Filter3()" class="btn">SelfSupervised</button>
   </div>
   
   <div id="main">
     <button class="openbtn" id="openbtn" onclick="openNav()">&#9776; Open Settings</button>
+    <div class="graph-container" id="graph-container1">
+      <iframe id="graphFrame" src="{{ graph_file }}" width="100%" height="100%" style="display: none;"></iframe>
+      <button class="close-graph" id="closeGraph1" style="display: none;">X</button>
+    </div>
+    <div class="graph-container" id="graph-container2">
+      <iframe id="graphFrame2" src="{{ graph_file }}" width="100%" height="100%" style="display: none;"></iframe>
+      <button class="close-graph" id="closeGraph2" style="display: none;">X</button>
+    </div>
+    <a href="index.html" class="homebtn">Home</a>
   </div>
-  <div class="graph-container">
-    <iframe id="graphFrame" src="{{ graph_file }}" width="1425" height="1000" style="display: none;"></iframe>
-    <button class="close-graph" id="closeGraph1" style="display: none;">X</button> <!-- Close button for the first graph -->
-  </div>
-  <div class="graph-container">
-    <iframe id="graphFrame2" src="{{ graph_file }}" width="1425" height="1000" style="display: none;"></iframe>
-    <button class="close-graph" id="closeGraph2" style="display: none;">X</button> <!-- Close button for the second graph -->
-  </div>
+  
   <script src="../static/js/playground.js"></script>
 </body>
 </html>

@@ -3,6 +3,9 @@ body {
   margin: 0;
   padding: 0;
   background-color: black; /* Set the background color to black */
+  font-family: 'Lato', sans-serif; /* Use Lato font */
+  color: white; /* Set text color to white */
+  overflow: hidden; /* Prevent scrolling */
 }
 
 .background {
@@ -10,26 +13,30 @@ body {
   display: block;
   top: 0;
   left: 0;
+  width: 100%;
+  height: 100%;
   z-index: 0;
 }
 
-.grey_square {
+.overlay {
   position: absolute;
+  background-color: rgba(128, 128, 128, 0.8); /* Grey color with opacity */
+  z-index: 1;
+}
+
+.grey_square {
   top: 10%;
   left: 5%;
   width: 2%;
   height: 4%;
-  background-color: rgba(128, 128, 128); 
 }
 
 .The_Spotter {
   position: absolute;
-  font-weight: bold;
   top: 10%;
-  left: 8%; /* Adjust left position as needed */
+  left: 8%;
   font-size: 24px;
-  color: white;
-  font-family: Arial, sans-serif;
+  z-index: 2;
 }
 
 .description {
@@ -57,51 +64,61 @@ body {
 
 }
 
+.home-link {
+  top: 11%;
+  left: 40%;
+}
+
 .about_us-link {
-    position: absolute;
-    top: 11%;
-    left: 40%; /* Adjust right position as needed */
-    font-size: 18px;
-    color: white;
-    font-family: Arial, sans-serif;
-    text-decoration: none; /* Remove underline */
+  top: 11%;
+  left: 50%;
+}
+
+.log_in-link {
+  top: 11%;
+  left: 60%;
+}
+
+.black_square {
+  top: 12%;
+  left: 38%;
+  width: 1%;
+  height: 2%;
+}
+
+
+.github-button {
+  position: fixed;
+  top: 10%; /* Adjust top position as needed */
+  right: 7%; /* Adjust right position as needed */
+  z-index: 9999; /* Ensure it's on top of other content */
+}
+
+.github-logo {
+  width: 40px; /* Adjust width as needed */
+  height: auto; /* Maintain aspect ratio */
+}
+
+.nav-link {
+  position: absolute;
+  font-size: 18px;
+  color: white;
+  text-decoration: none; /* Remove underline */
+  transition: color 0.3s; /* Smooth color transition */
+}
+.nav-link:hover {
+  color: #007BFF; /* Change link color on hover */
+}
+.bolded {
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  .text {
+    font-size: 16px;
   }
 
-  .log_in-link {
-    position: absolute;
-    top: 11%;
-    left: 55%; /* Adjust right position as needed */
-    font-size: 18px;
-    color: white;
-    font-family: Arial, sans-serif;
-    text-decoration: none; /* Remove underline */
+  .nav-link {
+    font-size: 16px;
   }
-  
-  .home-link {
-    position: absolute;
-    top: 11%;
-    left: 30%; /* Adjust right position as needed */
-    font-size: 18px;
-    color: white;
-    font-family: Arial, sans-serif;
-    text-decoration: none; /* Remove underline */
-  }
-  
-  .create_acc-link {
-    position: absolute;
-    top: 11%;
-    left: 65%; /* Adjust right position as needed */
-    font-size: 18px;
-    color: white;
-    font-family: Arial, sans-serif;
-    text-decoration: none; /* Remove underline */
-  }
-
-  .black_square {
-    position: absolute;
-    top: 11.5%;
-    left: 28%;
-    width: 1%;
-    height: 2%;
-    background-color: rgba(128, 128, 128); 
-  }
+}

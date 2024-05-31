@@ -5,20 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>The Spotter</title>
   <link rel="stylesheet" href="../static/css/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;700&display=swap" rel="stylesheet"> <!-- Include Lato font -->
 </head>
 <body>
   <div id="container"></div>
-  <canvas class="background"></canvas> <!-- Add canvas element -->
-  <div class="grey_square"></div> <!-- Add overlay element -->
-  <div class="black_square"></div> <!-- Add overlay element -->
-  <div class="See_beyond h2">See Beyond <br> the Graph</div> <!-- Add title element -->
-  <div class="The_Spotter"><span class="bolded">The Spotter</span></div> <!-- Add subtitle element -->
-  <div class="text"><p>Find anomalies in amazon review graphs</p><p>in less clicks and less time than what you</p> expected.</div>
-  <a href="about_us.html" class="about_us-link">About Us</a>
-  <a href="log_in.html" class="log_in-link">Log In</a>
-  <a href="create_acc.html" class="create_acc-link">Create Account</a>
-  <a href="index.html" class="home-link"><u>Home</u></a>
-  <script src="../static/js/node_modules/particlesjs/dist/particles.min.js"></script> <!-- Include particles.js -->
+  <canvas class="background"></canvas>
+  <div class="grey_square overlay"></div>
+  <div class="black_square overlay"></div>
+  <div class="See_beyond h2">See Beyond <br> the Graph</div>
+  <div class="The_Spotter"><span class="bolded">The Spotter</span></div>
+  <div class="text">
+    <p>Find anomalies in Amazon review graphs</p>
+    <p>in less clicks and less time than what you expected.</p>
+  </div>
+  <a href="index.html" class="home-link nav-link"><u>Home</u></a>
+  <a href="about_us.html" class="about_us-link nav-link">About Us</a>
+  <a href="playground.html" class="log_in-link nav-link">Playground</a>
+  <a href="https://github.com/joanlafuente/Graph-Anomaly-Detection" target="_blank" rel="noopener noreferrer" class="github-button">
+    <img src="../static/images/githubi.png" alt="GitHub Repository" class="github-logo">
+  </a>
+  
+  <script src="../static/js/node_modules/particlesjs/dist/particles.min.js"></script>
   <script src="../static/js/script.js"></script>
 </body>
 </html>
