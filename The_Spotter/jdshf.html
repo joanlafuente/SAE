@@ -21,20 +21,16 @@
     <button class="openbtn" id="openbtn" onclick="openNav()">&#9776; Open Settings</button>
   </div>
   <div class="graph-container">
-    <div class="graph-wrapper">
-      <iframe id="graphFrame" src="{{ graph_file }}" width="900" height="500" style="display: none;"></iframe>
-      <button class="close-graph" id="closeGraph1" style="display: none;">X</button> <!-- Close button for the first graph -->
-    </div>
+    <iframe id="graphFrame" src="{{ graph_file }}" width="1425" height="1000" style="display: none;"></iframe>
+    <button class="close-graph" id="closeGraph1" style="display: none;">X</button> <!-- Close button for the first graph -->
   </div>
   <div class="graph-container">
-    <iframe id="graphFrame2" src="" width="800" height="500" style="display: none;"></iframe>
+    <iframe id="graphFrame2" src="{{ graph_file }}" width="1425" height="1000" style="display: none;"></iframe>
     <button class="close-graph" id="closeGraph2" style="display: none;">X</button> <!-- Close button for the second graph -->
   </div>
   <script src="../static/js/playground.js"></script>
 </body>
 </html>
-
-
 
 
 
@@ -58,18 +54,21 @@ body {
   overflow-x: hidden;
   padding-top: 60px;
   transition: 0.5s;
+  
 }
 .sidebar .title {
   color: white;
   font-size: 20px;
   font-weight: bold;
   padding: 10px;
+ 
 }
 .sidebar .text {
   color: rgba(159, 159, 159, 0.767);
   font-size: 20px;
   font-weight: bold;
   padding: 10px;
+  
 }
 
 .sidebar a {
@@ -79,10 +78,12 @@ body {
   color: #818181;
   display: block;
   transition: 0.3s;
+  
 }
 
 .sidebar a:hover {
   color: #f1f1f1;
+  
 }
 
 .sidebar .closebtn {
@@ -91,6 +92,7 @@ body {
   right: 25px;
   font-size: 36px;
   margin-left: 50px;
+  
 }
 
 .openbtn {
@@ -100,10 +102,12 @@ body {
   color: white;
   padding: 10px 15px;
   border: none;
+ 
 }
 
 .openbtn:hover {
   background-color: #444;
+  
 }
 
 #main {
@@ -113,13 +117,10 @@ body {
 
 .graph-container{
   position: absolute;
-  top: 45%;  
-  left: 48%;
-  transform: translate(-50%, -50%);
+  top: 10%;  
+  left: 5%;
+  right: 1%;
 }
-
-
-
 
 .close-graph {
   position: absolute;
@@ -130,11 +131,7 @@ body {
   cursor: pointer; /* Cursor style */
   padding: 5px 10px; /* Some padding */
   border: none; /* No border */
-}
-
-@media screen and (max-height: 450px) {
-  .sidebar {padding-top: 15px;}
-  .sidebar a {font-size: 18px;}
+  z-index: 5;
 }
 
 
@@ -218,6 +215,12 @@ document.getElementById('closeGraph2').addEventListener('click', function() {
 
 
 
+
+
+
+
+
+
 import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_from_directory
@@ -280,26 +283,27 @@ def playground():
 @app.route('/playground_graph1')
 def playground_graph1_route():
     # Generate the second graph
-    graph_file= generate_playground_graph1()
+    graph_file, graph= generate_playground_graph1()
+    print(graph_file)
     # Return the file path of the second graph
     return render_template('graph.html', graph_file=graph_file)
 
 def generate_playground_graph1():
     # Create a pyvis network object
-    graph = Network()
+    graph = Network(select_menu=True, cdn_resources='remote', filter_menu=True)
 
     # Add nodes and edges to the graph (example)
     graph.add_node(1, label='Node 1')
     graph.add_node(2, label='Node 2')
     graph.add_edge(1, 2)
 
-    graph.show_buttons(filter_=['physics'])
+    graph.show_buttons(filter_=['nodes', 'edges', 'physics'])
     # Save the graph to a file
-    graph_file = os.path.join(app.static_folder, 'graph.html')
+    graph_file = os.path.join(app.static_folder, 'graph1.html')
     graph.write_html(graph_file)
     print("graph_file1")
     # Render the playground page with the graph
-    return '/static/graph.html'
+    return '/static/graph1.html', graph
 
 
 @app.route('/playground_graph2')
@@ -312,15 +316,17 @@ def playground_graph2_route():
 
 def generate_playground_graph2():
     # Create a pyvis network object
-    graph = Network()
+    graph = Network(cdn_resources='remote', filter_menu=True, directed=False, select_menu=True)
 
     # Add nodes and edges to the graph (example)
     graph.add_node(1, label='Node 1')
     graph.add_node(2, label='Node 2')
     graph.add_node(3, label='Node 3')
+    graph.add_node(4, label='Node 4')
     graph.add_edge(1, 2)
     graph.add_edge(1, 3)
     graph.add_edge(3, 2)
+    graph.add_edge(4, 2)
 
     graph.show_buttons(filter_=['physics'])
     # Save the graph to a file
@@ -420,35 +426,21 @@ if __name__ == "__main__":
     app.run(debug=True, port=8082)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     <!DOCTYPE html>
-<html>
-<head>
-    <title>Graph</title>
-    <style>
-        body, html, iframe {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-        }
-    </style>
-</head>
-<body>
-    <iframe src="{{ graph_file }}"></iframe>
-</body>
-</html>
+    <html>
+    <head>
+        <title>Graph</title>
+        <style>
+            body, html, iframe {
+                margin: 0;
+                padding: 0;
+                height: 100%;
+                width: 100%;
+                overflow: hidden;
+            }
+        </style>
+    </head>
+    <body>
+        <iframe src="{{ graph_file }}"></iframe>
+    </body>
+    </html>

@@ -59,61 +59,74 @@ def log_in():
 def playground():
     return render_template('playground.html')
 
-@app.route('/playground_graph1')
-def playground_graph1_route():
+@app.route('/playground_graph1/<model>')
+def playground_graph1_route(model=None):
     # Generate the second graph
-    graph_file, graph= generate_playground_graph1()
+    graph_file = generate_playground_graph1(model)
     print(graph_file)
     # Return the file path of the second graph
     return render_template('graph.html', graph_file=graph_file)
 
-def generate_playground_graph1():
+@app.route('/playground_graph1')
+def playground_graph1_route_o():
+    # Generate the second graph
+    graph_file = generate_playground_graph1()
+    print(graph_file)
+    # Return the file path of the second graph
+    return render_template('graph.html', graph_file=graph_file)
+
+def generate_playground_graph1(model=None):
     # Create a pyvis network object
-    graph = Network(select_menu=True, cdn_resources='remote', filter_menu=True)
 
     # Add nodes and edges to the graph (example)
-    graph.add_node(1, label='Node 1')
-    graph.add_node(2, label='Node 2')
-    graph.add_edge(1, 2)
+    if (model is None):
+        print("Amazon")
+        return '/static/Amazon.html'
+    
+    if (model == 'Supervised'):
+        print("Amazon Supervised")
+        return '/static/AmazonSupervised.html'
+    
+    if (model == 'Autoencoder'):
+        print("Amazon Autoencoder")
+        return '/static/AmazonAutoencoders.html'
+    
+    if (model == "SelfSupervised"):
+        print("Amazon Self Supervised")
+        return '/static/AmazonSelfSupervised.html'
+        
 
-    graph.show_buttons(filter_=['nodes', 'edges', 'physics'])
-    # Save the graph to a file
-    graph_file = os.path.join(app.static_folder, 'graph1.html')
-    graph.write_html(graph_file)
-    print("graph_file1")
-    # Render the playground page with the graph
-    return '/static/graph1.html', graph
 
+@app.route('/playground_graph2/<model>')
+def playground_graph2_route(model=None):
+    # Generate the second graph
+    graph_file = generate_playground_graph2(model)
+    print(graph_file)
+    # Return the file path of the second graph
+    return render_template('graph.html', graph_file=graph_file)
 
 @app.route('/playground_graph2')
-def playground_graph2_route():
+def playground_graph2_route_o():
     # Generate the second graph
-    graph_file, graph = generate_playground_graph2()
+    graph_file = generate_playground_graph2()
     print(graph_file)
     # Return the file path of the second graph
     return render_template('graph.html', graph_file=graph_file)
 
-def generate_playground_graph2():
-    # Create a pyvis network object
-    graph = Network(cdn_resources='remote', filter_menu=True, directed=False, select_menu=True)
-
+def generate_playground_graph2(model=None):
     # Add nodes and edges to the graph (example)
-    graph.add_node(1, label='Node 1', color='red')
-    graph.add_node(2, label='Node 2')
-    graph.add_node(3, label='Node 3')
-    graph.add_node(4, label='Node 4')
-    graph.add_edge(1, 2)
-    graph.add_edge(1, 3)
-    graph.add_edge(3, 2)
-    graph.add_edge(4, 2)
-
-    graph.show_buttons(filter_=['physics'])
-    # Save the graph to a file
-    graph_file = os.path.join(app.static_folder, 'graph2.html')
-    graph.write_html(graph_file)
-    print("graph_file2")
-    # Return the file path and the graph object
-    return '/static/graph2.html', graph
+    if model is None:
+        print("Yelp")
+        return '/static/Yelp.html'
+        
+    if model == 'Supervised':
+        print("Yelp Supervised")
+        return '/static/YelpSupervised.html'
+    
+    if model == 'Autoencoder':
+        print("Yelp Autoencoder")
+        return '/static/YelpAutoencoders.html'
+    
 
 
 
@@ -202,6 +215,6 @@ def register():
         return render_template("register.html")
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8082)
+    app.run(debug=True, port=8081)
 
 
