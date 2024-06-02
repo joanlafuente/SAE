@@ -1998,3 +1998,61 @@ class GAE_model_PNA(torch.nn.Module):
         x = self.encode(data)
         x = self.classifier(x)
         return x
+
+
+class PNA_Edge_feat(torch.nn.Module):
+    def __init__(self, dropout_PNA=0, dropout=0, hidden_channels=10, out_channels_GAT=5,  out_channels_proj=5, num_layers=1, in_channels=25):
+        super().__init__()
+        aggregators = ['mean', 'mean', 'mean']
+        scalers = ['identity', 'identity', 'identity']
+        deg = torch.tensor([2, 2, 2])
+        
+        self.in_norm = nn.BatchNorm1d(in_channels)
+        self.PNA_norm = nn.BatchNorm1d(out_channels_GAT)
+
+        # TanH activation
+        self.activation = nn.Tanh()
+
+        self.gat = PNA(in_channels=in_channels, 
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels_GAT,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg)
+        
+        self.projection = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(out_channels_GAT, out_channels_proj),
+            nn.BatchNorm1d(out_channels_proj),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(out_channels_proj, out_channels_proj),
+        )
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(out_channels_proj, int((out_channels_proj+2)/2)),
+            nn.BatchNorm1d(int((out_channels_proj+2)/2)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int((out_channels_proj+2)/2), 2),
+        )
+
+    def contrastive(self, data):
+        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
+        x = self.in_norm(x)
+
+        edge_index = torch.cat((edge_index_p, edge_index_s, edge_index_v), 1)
+        edge_attr = torch.cat((torch.ones(edge_index_p.size(1)), torch.ones(edge_index_s.size(1))*2, torch.ones(edge_index_v.size(1))*3)).long()
+
+        x = self.gat(x, edge_index, edge_attr)
+        x = self.PNA_norm(x)
+        x = self.activation(x)
+        x = self.projection(x)
+        return x
+
+    def forward(self, data):
+        x = self.contrastive(data)
+        x = self.classifier(x)
+        return x
