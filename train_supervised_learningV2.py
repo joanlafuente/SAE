@@ -18,6 +18,7 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 import seaborn as sns
 import copy
 import os
@@ -39,6 +40,8 @@ print(f'Running {name_yaml}')
 with open(f'./Setups/Supervised/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
+# In case the train_data_percentage is not specified, we use the whole training set
+# Otherwise, we use the percentage specified of the training set
 if "train_data_percentage" not in params.keys():
     use_percentage_train = 1
 else:
@@ -48,153 +51,11 @@ else:
         raise ValueError(f'train_data_percentage cannot be greater than {total_train} for the {params["data"]} dataset')
 
 
+# Load the graph, the masks and the run path
+graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, "Supervised", name_yaml,  
+                                                                                           use_percentage_train=use_percentage_train)
 
-if params["data"] == "amz":
-    run_path = f"./Runs/Supervised/Amazon/{name_yaml}"
-    # Creating a folder for the run files
-    if not os.path.exists(f'{run_path}'):
-        os.makedirs(f'{run_path}')
-        os.makedirs(f'{run_path}/Weights')
-        os.makedirs(f'{run_path}/Plots')
-        os.makedirs(f'{run_path}/Report')
-
-    # Loading data
-    data_file = loadmat('./Data/Amazon.mat')
-    labels = data_file['label'].flatten()
-    feat_data = data_file['features'].todense().A
-
-    train_mask = torch.zeros(11944, dtype=torch.bool)
-    val_mask = torch.zeros(11944, dtype=torch.bool)
-    test_mask = torch.zeros(11944, dtype=torch.bool)
-    train_mask_contrastive = torch.zeros(11944, dtype=torch.bool)
-
-    nodes = list(range(3305, 11944))
-    train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.6, stratify=labels[nodes], random_state=0)
-    val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
-    
-    if use_percentage_train != 1:
-        train_nodes, not_used_nodes = train_test_split(train_nodes, train_size=use_percentage_train, stratify=labels[train_nodes], random_state=0)
-        print(f'Using {use_percentage_train * 0.6 * 100}% of the training data')
-    
-    train_nodes_contrastive = train_nodes + list(range(0, 3305))
-
-    train_mask[train_nodes] = True
-    val_mask[val_nodes] = True
-    test_mask[test_nodes] = True
-    train_mask_contrastive[train_nodes_contrastive] = True
-
-
-    with open('./Data/amz_upu_adjlists.pickle', 'rb') as file:
-        upu = pickle.load(file)
-
-    with open('./Data/amz_usu_adjlists.pickle', 'rb') as file:
-        usu = pickle.load(file)
-
-    with open('./Data/amz_uvu_adjlists.pickle', 'rb') as file:
-        uvu = pickle.load(file)
-
-    edges_list_p = []
-    for i in range(len(upu)):
-        edges_list_p.extend([(i, node) for node in upu[i]])
-    edges_list_p = np.array(edges_list_p)
-    edges_list_p = edges_list_p.transpose()
-
-    edges_list_s = []
-    for i in range(len(upu)):
-        edges_list_s.extend([(i, node) for node in usu[i]])
-    edges_list_s = np.array(edges_list_s)
-    edges_list_s = edges_list_s.transpose()
-
-    edges_list_v = []
-    for i in range(len(upu)):
-        edges_list_v.extend([(i, node) for node in uvu[i]])
-    edges_list_v = np.array(edges_list_v)
-    edges_list_v = edges_list_v.transpose()
-
-    # Creating graph
-    graph = Data(x=torch.tensor(feat_data).float(), 
-                edge_index_v=torch.tensor(edges_list_v), 
-                edge_index_p=torch.tensor(edges_list_p),
-                edge_index_s=torch.tensor(edges_list_s),
-                y=torch.tensor(labels).type(torch.int64),
-                train_mask=train_mask,
-                val_mask=val_mask,
-                test_mask=test_mask,
-                train_mask_contrastive=train_mask_contrastive)
-
-elif params["data"] == "yelp":
-    run_path = f"./Runs/Supervised/Yelp/{name_yaml}"
-    # Creating a folder for the run files
-    if not os.path.exists(f'{run_path}'):
-        os.makedirs(f'{run_path}')
-        os.makedirs(f'{run_path}/Weights')
-        os.makedirs(f'{run_path}/Plots')
-        os.makedirs(f'{run_path}/Report')
-    # Loading data
-    data_file = loadmat('./Data/YelpChi.mat')
-    labels = data_file['label'].flatten()
-    feat_data = data_file['features'].todense().A
-
-    num_nodes = feat_data.shape[0]
-
-    train_mask = torch.zeros(num_nodes, dtype=torch.bool)
-    val_mask = torch.zeros(num_nodes, dtype=torch.bool)
-    test_mask = torch.zeros(num_nodes, dtype=torch.bool)
-    train_mask_contrastive = torch.zeros(num_nodes, dtype=torch.bool)
-
-    nodes = np.arange(num_nodes)
-    train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.7, stratify=labels, random_state=0)
-    val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
-    if use_percentage_train != 1:
-        train_nodes, not_used_nodes = train_test_split(train_nodes, train_size=use_percentage_train, stratify=labels[train_nodes], random_state=0)
-        print(f'Using {use_percentage_train * 0.7 * 100}% of the training data')
-    train_nodes_contrastive = train_nodes 
-
-    train_mask[train_nodes] = True
-    val_mask[val_nodes] = True
-    test_mask[test_nodes] = True
-    train_mask_contrastive[train_nodes_contrastive] = True
-
-
-    with open('./Data/yelp_rtr_adjlists.pickle', 'rb') as file:
-        upu = pickle.load(file)
-
-    with open('./Data/yelp_rsr_adjlists.pickle', 'rb') as file:
-        usu = pickle.load(file)
-
-    with open('./Data/yelp_rur_adjlists.pickle', 'rb') as file:
-        uvu = pickle.load(file)
-
-    edges_list_p = []
-    for i in range(len(upu)):
-        edges_list_p.extend([(i, node) for node in upu[i]])
-    edges_list_p = np.array(edges_list_p)
-    edges_list_p = edges_list_p.transpose()
-
-    edges_list_s = []
-    for i in range(len(upu)):
-        edges_list_s.extend([(i, node) for node in usu[i]])
-    edges_list_s = np.array(edges_list_s)
-    edges_list_s = edges_list_s.transpose()
-
-    edges_list_v = []
-    for i in range(len(upu)):
-        edges_list_v.extend([(i, node) for node in uvu[i]])
-    edges_list_v = np.array(edges_list_v)
-    edges_list_v = edges_list_v.transpose()
-
-    # Creating graph
-    graph = Data(x=torch.tensor(feat_data).float(), 
-                edge_index_v=torch.tensor(edges_list_v), 
-                edge_index_p=torch.tensor(edges_list_p),
-                edge_index_s=torch.tensor(edges_list_s),
-                y=torch.tensor(labels).type(torch.int64),
-                train_mask=train_mask,
-                val_mask=val_mask,
-                test_mask=test_mask,
-                train_mask_contrastive=train_mask_contrastive)
-
-
+# Load the specified model
 if params["model_name"] == 'Simpler_GCN':
     model = Simpler_GCN(**params['model'])
 elif params["model_name"] == 'Simpler_GCN_Conv':
@@ -228,23 +89,29 @@ elif params["model_name"] == 'PNA_Edge_feat':
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 
+# Move the model into cuda if available
 model = model.to(device)
-
 graph = graph.to(device)
 
+# Obtain the parameters that require gradients
 parameters = filter(lambda p: p.requires_grad, model.parameters())
 
+# Define the optimizer
 optimizer_gcn = torch.optim.AdamW(parameters, lr=params["lr"], weight_decay=params["weight_decay"])
 
+# Compute the class weights for the loss function
+# In order to balance the classes weight on the loss function
 train_samples = graph.y[graph.train_mask]
 weight_for_class_0 = len(train_samples) / (len(train_samples[train_samples == 0]) * 2)
 weight_for_class_1 = len(train_samples) / (len(train_samples[train_samples == 1]) * 2)
 criterion = nn.CrossEntropyLoss(weight=torch.tensor([weight_for_class_0, weight_for_class_1]).to(device))
 
 if ("OnlyEval" in params.keys()) and params["OnlyEval"]:
+    # Load the model if we are only evaluating 
     model.load_state_dict(torch.load(f'{run_path}/Weights/cls_sup_{name_yaml}.pth', map_location=device))
     print('Model loaded for evaluation')
 elif ("ContrastiveAndClassification" in params.keys()) and params["ContrastiveAndClassification"]:
+    # Train the model with the contrastive and classification loss
     model = train_node_embedder_and_classifier_supervised(model=model, graph=graph, optimizer=optimizer_gcn, criterion=criterion,
                                                           config=params, name_model=f'{run_path}/Weights/cls_sup_{name_yaml}.pth')
     
@@ -259,16 +126,19 @@ elif ("ContrastiveAndClassification" in params.keys()) and params["ContrastiveAn
     with open(f'{run_path}/embeds_contr_sup_{name_yaml}.pkl', 'wb') as file:
         pkl.dump(out, file)
 
+    # Save the masks used for training, validation and testing
     with open(f"{run_path}/train_test_val_masks_{name_yaml}.pkl", "wb") as file:
         pkl.dump([train_mask, val_mask, test_mask, train_mask_contrastive], file)
 
 
+    # Reduce the dimensionality of the embeddings for visualization
     if ("DimReduction" not in params.keys()) or (params["DimReduction"] == "tsne"):
         # Applying t-SNE
         tsne = TSNE(n_components=2, random_state=42)
         X_tsne = tsne.fit_transform(out[3305:])  # Assuming the first 3304 are unlabeled and hence excluded
 
     elif params["DimReduction"] == "autoencoder":
+        # Applying a single layer MLP autoencoder
         from sklearn.neural_network import MLPRegressor
         autoencoder = MLPRegressor(hidden_layer_sizes=(2, ), 
                                    activation='identity',
@@ -282,7 +152,7 @@ elif ("ContrastiveAndClassification" in params.keys()) and params["ContrastiveAn
     X_tsne_benign = X_tsne[labels[3305:] == 0]
     X_tsne_fraudulent = X_tsne[labels[3305:] == 1]
 
-    # Plotting
+    # Plotting all the nodes
     plt.figure(figsize=(10, 6))
     plt.scatter(X_tsne_benign[:, 0], X_tsne_benign[:, 1], label='Benign (Class 0)', alpha=0.5)
     plt.scatter(X_tsne_fraudulent[:, 0], X_tsne_fraudulent[:, 1], label='Fraudulent (Class 1)', alpha=0.5)
@@ -337,6 +207,7 @@ elif ("ContrastiveAndClassification" in params.keys()) and params["ContrastiveAn
     plt.savefig(f'{run_path}/Plots/embeds_contr_sup_{name_yaml}_train.png')
     plt.close()
 else:
+    # Train the model with only the classification loss
     model = train_node_classifier_minibatches(model=model, graph=graph, config=params, 
                                           criterion=criterion, optimizer=optimizer_gcn, 
                                           name_model=f'{run_path}/Weights/cls_sup_{name_yaml}.pth')
@@ -357,7 +228,7 @@ if ("GenerateTSNE" in params.keys()) and params["GenerateTSNE"]:
     X_tsne_benign = X_tsne[labels[3305:] == 0]
     X_tsne_fraudulent = X_tsne[labels[3305:] == 1]
 
-    # Plotting
+    # Plotting all the nodes
     plt.figure(figsize=(10, 6))
     plt.scatter(X_tsne_benign[:, 0], X_tsne_benign[:, 1], label='Benign (Class 0)', alpha=0.5)
     plt.scatter(X_tsne_fraudulent[:, 0], X_tsne_fraudulent[:, 1], label='Fraudulent (Class 1)', alpha=0.5)
@@ -400,11 +271,14 @@ if ("GenerateTSNE" in params.keys()) and params["GenerateTSNE"]:
     plt.savefig(f'{run_path}/Plots/embeds_TSNE_contr_sup_{name_yaml}_train.png')
     plt.close()
 
+# Load the weights of the previously trained model
 model.load_state_dict(torch.load(f'{run_path}/Weights/cls_sup_{name_yaml}.pth', map_location=device))
 
+# Evaluate the model
 test_acc, f1, predictions = eval_node_classifier(model, graph, graph.test_mask)
 print(f'Test Acc: {test_acc:.3f}, Test F1: {f1:.3f}')
 
+# Compute the confusion matrix
 conf_matrix = confusion_matrix(graph.y[graph.test_mask].cpu().numpy(),
                                predictions[graph.test_mask].cpu().numpy())
 sns.heatmap(conf_matrix, annot=True, fmt='d')
@@ -413,16 +287,16 @@ plt.ylabel('True Label')
 plt.savefig(f'{run_path}/Plots/cm_cls_sup_{name_yaml}.png')
 plt.close()
 
-from sklearn.metrics import classification_report
+# Compute several metrics for both classes
 report = classification_report(graph.y[graph.test_mask].cpu().numpy(), predictions[graph.test_mask].cpu().numpy(), output_dict=True)
 
-
+# Computing the area under the curve and the average precision scores
 report["ROC_AUC"] = compute_ROC_AUC(model, graph, graph.test_mask)
 report["AP"] = compute_Average_Precision(model, graph, graph.test_mask)
 
-
+# Computing the ROC curve
 fpr, tpr = compute_ROC_curve(model, graph, graph.test_mask)
-
+# Plotting the ROC curve
 plt.figure()
 lw = 2
 plt.plot(
@@ -441,9 +315,10 @@ plt.title('ROC Curve')
 plt.savefig(f'{run_path}/Plots/roc_curve_{name_yaml}.png')
 plt.close()
 
-
+# Computing the Precision-Recall curve
 precision, recall = compute_PR_curve(model, graph, graph.test_mask)
 
+# Plotting the Precision-Recall curve
 plt.figure()
 lw = 2
 plt.plot(
@@ -461,5 +336,6 @@ plt.title("Precision-Recall curve")
 plt.savefig(f'{run_path}/Plots/PR_curve_{name_yaml}.png')
 plt.close()
 
+# Save the classification metrics
 with open(f'{run_path}/Report/cls_{name_yaml}.txt', 'w') as file:
     file.write(str(report))

@@ -10,8 +10,10 @@ import pickle
 import numpy as np
 from tqdm import tqdm
 import random
+import os
 
 from sklearn.metrics import confusion_matrix, roc_auc_score, f1_score, roc_curve, average_precision_score, precision_recall_curve
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import seaborn as sns
 import copy
@@ -21,6 +23,171 @@ from pytorch_metric_learning.utils.accuracy_calculator import AccuracyCalculator
 import wandb
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+def preprocess_data(params, name_yaml, approach, use_percentage_train=1):
+    if params["data"] == "amz":
+        # Creating the path to save the run files
+        run_path = f"./Runs/{approach}/Amazon/{name_yaml}"
+
+        # Creating a folder for the run files
+        if not os.path.exists(f'{run_path}'):
+            os.makedirs(f'{run_path}')
+            os.makedirs(f'{run_path}/Weights')
+            os.makedirs(f'{run_path}/Plots')
+            os.makedirs(f'{run_path}/Report')
+            if approach != 'Supervised':
+                os.makedirs(f'{run_path}/Pickles')
+
+        # Loading data
+        data_file = loadmat('./Data/Amazon.mat')
+        labels = data_file['label'].flatten()
+        feat_data = data_file['features'].todense().A
+
+        # Splitting the data into train, validation and test
+        nodes = list(range(3305, 11944))
+        train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.6, stratify=labels[nodes], random_state=0)
+        val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
+        # In case not all the training data is used
+        if use_percentage_train != 1:
+            train_nodes, not_used_nodes = train_test_split(train_nodes, train_size=use_percentage_train, stratify=labels[train_nodes], random_state=0)
+            print(f'Using {use_percentage_train * 0.6 * 100}% of the training data')
+
+        # Nodes used for the contrastive learning (Training set + non-labelled data)
+        train_nodes_contrastive = train_nodes + list(range(0, 3305))
+
+        # Inizializing the masks for the train, validation and test sets
+        train_mask = torch.zeros(11944, dtype=torch.bool)
+        val_mask = torch.zeros(11944, dtype=torch.bool)
+        test_mask = torch.zeros(11944, dtype=torch.bool)
+        train_mask_contrastive = torch.zeros(11944, dtype=torch.bool)
+
+        # Setting the masks
+        train_mask[train_nodes] = True
+        val_mask[val_nodes] = True
+        test_mask[test_nodes] = True
+        train_mask_contrastive[train_nodes_contrastive] = True
+
+        # Loading the adjacency lists for the three types of edges
+        with open('./Data/amz_upu_adjlists.pickle', 'rb') as file:
+            upu = pickle.load(file)
+        with open('./Data/amz_usu_adjlists.pickle', 'rb') as file:
+            usu = pickle.load(file)
+        with open('./Data/amz_uvu_adjlists.pickle', 'rb') as file:
+            uvu = pickle.load(file)
+
+
+        # Processing the adjacency lists to create the edge lists
+        # For each type of edge, an edge list is created
+        edges_list_p = []
+        for i in range(len(upu)):
+            edges_list_p.extend([(i, node) for node in upu[i]])
+        edges_list_p = np.array(edges_list_p)
+        edges_list_p = edges_list_p.transpose()
+
+        edges_list_s = []
+        for i in range(len(upu)):
+            edges_list_s.extend([(i, node) for node in usu[i]])
+        edges_list_s = np.array(edges_list_s)
+        edges_list_s = edges_list_s.transpose()
+
+        edges_list_v = []
+        for i in range(len(upu)):
+            edges_list_v.extend([(i, node) for node in uvu[i]])
+        edges_list_v = np.array(edges_list_v)
+        edges_list_v = edges_list_v.transpose()
+
+        # Creating graph data structure from torch_geometric
+        graph = Data(x=torch.tensor(feat_data).float(), 
+                    edge_index_v=torch.tensor(edges_list_v), 
+                    edge_index_p=torch.tensor(edges_list_p),
+                    edge_index_s=torch.tensor(edges_list_s),
+                    y=torch.tensor(labels).type(torch.int64),
+                    train_mask=train_mask,
+                    val_mask=val_mask,
+                    test_mask=test_mask,
+                    train_mask_contrastive=train_mask_contrastive)
+
+    elif params["data"] == "yelp":
+        run_path = f"./Runs/{approach}/Yelp/{name_yaml}"
+        # Creating a folder for the run files
+        if not os.path.exists(f'{run_path}'):
+            os.makedirs(f'{run_path}')
+            os.makedirs(f'{run_path}/Weights')
+            os.makedirs(f'{run_path}/Plots')
+            os.makedirs(f'{run_path}/Report')
+            if approach != 'Supervised':
+                os.makedirs(f'{run_path}/Pickles')
+
+        # Loading data
+        data_file = loadmat('./Data/YelpChi.mat')
+        labels = data_file['label'].flatten()
+        feat_data = data_file['features'].todense().A
+
+        num_nodes = feat_data.shape[0]
+
+        # Splitting the data into train, validation and test
+        nodes = np.arange(num_nodes)
+        train_nodes, test_val_nodes = train_test_split(nodes, train_size=0.7, stratify=labels, random_state=0)
+        val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
+        # In case not all the training data is used
+        if use_percentage_train != 1:
+            train_nodes, not_used_nodes = train_test_split(train_nodes, train_size=use_percentage_train, stratify=labels[train_nodes], random_state=0)
+            print(f'Using {use_percentage_train * 0.7 * 100}% of the training data')
+        # Nodes used for the contrastive learning (In this case is the same as the training set)
+        train_nodes_contrastive = train_nodes 
+
+        # Inizializing the masks for the train, validation and test sets
+        train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        val_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        test_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        train_mask_contrastive = torch.zeros(num_nodes, dtype=torch.bool)
+
+        # Setting the masks
+        train_mask[train_nodes] = True
+        val_mask[val_nodes] = True
+        test_mask[test_nodes] = True
+        train_mask_contrastive[train_nodes_contrastive] = True
+
+        # Loading the adjacency lists for the three types of edges
+        with open('./Data/yelp_rtr_adjlists.pickle', 'rb') as file:
+            upu = pickle.load(file)
+        with open('./Data/yelp_rsr_adjlists.pickle', 'rb') as file:
+            usu = pickle.load(file)
+        with open('./Data/yelp_rur_adjlists.pickle', 'rb') as file:
+            uvu = pickle.load(file)
+
+        # Processing the adjacency lists to create the edge lists
+        # For each type of edge, an edge list is created
+        edges_list_p = []
+        for i in range(len(upu)):
+            edges_list_p.extend([(i, node) for node in upu[i]])
+        edges_list_p = np.array(edges_list_p)
+        edges_list_p = edges_list_p.transpose()
+
+        edges_list_s = []
+        for i in range(len(upu)):
+            edges_list_s.extend([(i, node) for node in usu[i]])
+        edges_list_s = np.array(edges_list_s)
+        edges_list_s = edges_list_s.transpose()
+
+        edges_list_v = []
+        for i in range(len(upu)):
+            edges_list_v.extend([(i, node) for node in uvu[i]])
+        edges_list_v = np.array(edges_list_v)
+        edges_list_v = edges_list_v.transpose()
+
+        # Creating graph data structure from torch_geometric
+        graph = Data(x=torch.tensor(feat_data).float(), 
+                    edge_index_v=torch.tensor(edges_list_v), 
+                    edge_index_p=torch.tensor(edges_list_p),
+                    edge_index_s=torch.tensor(edges_list_s),
+                    y=torch.tensor(labels).type(torch.int64),
+                    train_mask=train_mask,
+                    val_mask=val_mask,
+                    test_mask=test_mask,
+                    train_mask_contrastive=train_mask_contrastive)
+    
+    return graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive
 
 def compute_ROC_curve(model, graph, mask):
     model.eval()
