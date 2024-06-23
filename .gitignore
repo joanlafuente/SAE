@@ -11,3 +11,5 @@ amazon_only_label.gexf
 /Pickles/
 /Plots/
 /Reports/
+
+/__pycache__/

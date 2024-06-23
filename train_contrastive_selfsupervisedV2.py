@@ -52,7 +52,7 @@ with open(f'./Setups/SelfSupervisedContrastive/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
 # Load the graph, the masks and the run path (It also creates the folder structure to save the experiment results)
-graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, "SelfSupervisedContrastive", name_yaml)
+graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, name_yaml, "SelfSupervisedContrastive")
 
 # Load the specified model
 if params["model_name"] == 'Simpler_GCN':

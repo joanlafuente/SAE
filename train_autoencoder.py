@@ -49,7 +49,7 @@ with open(f'./Setups/Autoencoder/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
 # Load the data and get the path of the run (It also creates the folder structure to save the experiment results)
-graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, "Autoencoder", name_yaml)
+graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, name_yaml, "Autoencoder")
 
 # Load the specified model
 if params["model_name"] == 'GCN_Att_Not_res_Autoencoder':
@@ -110,7 +110,7 @@ if "train_edge_autoencoder" in params and params["train_edge_autoencoder"]:
     # Save the embeddings
     with open(f'{run_path}/Pickles/embeds_contr_sup_{name_yaml}.pkl', 'wb') as file:
         pkl.dump(out, file)
-        
+
     # Save the masks used for training, validation and testing
     with open(f"{run_path}/Pickles/train_test_val_masks_{name_yaml}.pkl", "wb") as file:
         pkl.dump([train_mask, val_mask, test_mask, train_mask_contrastive], file)

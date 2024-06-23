@@ -27,14 +27,20 @@ from utils import *
 from models import GCN, GAE_model, GAE_model_PNA, Simpler_GCN, Simpler_GCN2, Simpler_GCN_Conv, GCN_Att, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat, GAT_BatchNormalitzation, GAT_SELU_Alphadrop, GIN_ReLU, GIN_tanh, GraphSAGE_model, PNA_model, PNA_model_2
 import yaml
 
+"""
+Script to generate predictions of a previously trained model.
+
+"""
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('Device:', device)
 
+# Check if the script has the correct input arguments
 if len(sys.argv) != 3:
     raise ValueError('The script needs two arguments: the name of the yaml file and the type of run.\nExample: python gen_predictions.py name_yaml Supervised\n')
 if sys.argv[2] not in ["Autoencoder", "SelfSupervisedContrastive", "Supervised", "SupervisedContrastive"]:
     raise ValueError(f'{sys.argv[2]} is not a valid run type. Use Autoencoder, SelfSupervisedContrastive, Supervised or SupervisedContrastive.')
+
 # Get the name of the yaml file
 name_yaml = sys.argv[1]
 print(f'Running {name_yaml}')
@@ -47,147 +53,21 @@ print(f'Run type: {run_type}')
 with open(f'./Setups/{run_type}/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
+# In case the train_data_percentage is not specified, we use the whole training set
+# Otherwise, we use the percentage specified of the training set
 if "train_data_percentage" not in params.keys():
-    params["train_data_percentage"] = 0.6 if params["data"] == "amz" else 0.7
+    use_percentage_train = 1
+else:
+    total_train = 0.7 if params["data"] == "yelp" else 0.6
+    use_percentage_train = params["train_data_percentage"] / total_train
+    if use_percentage_train > 1:
+        raise ValueError(f'train_data_percentage cannot be greater than {total_train} for the {params["data"]} dataset')
 
-if params["data"] == "amz":
-    run_path = f"./Runs/{run_type}/Amazon/{name_yaml}"
-    # Creating a folder for the run files
-    if not os.path.exists(f'{run_path}'):
-        os.makedirs(f'{run_path}')
-        os.makedirs(f'{run_path}/Weights')
-        os.makedirs(f'{run_path}/Plots')
-        os.makedirs(f'{run_path}/Report')
-
-    # Loading data
-    data_file = loadmat('./Data/Amazon.mat')
-    labels = data_file['label'].flatten()
-    feat_data = data_file['features'].todense().A
-
-    train_mask = torch.zeros(11944, dtype=torch.bool)
-    val_mask = torch.zeros(11944, dtype=torch.bool)
-    test_mask = torch.zeros(11944, dtype=torch.bool)
-    train_mask_contrastive = torch.zeros(11944, dtype=torch.bool)
-
-    nodes = list(range(3305, 11944))
-    train_nodes, test_val_nodes = train_test_split(nodes, train_size=params["train_data_percentage"], stratify=labels[nodes], random_state=0)
-    val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
-    train_nodes_contrastive = train_nodes + list(range(0, 3305))
-
-    train_mask[train_nodes] = True
-    val_mask[val_nodes] = True
-    test_mask[test_nodes] = True
-    train_mask_contrastive[train_nodes_contrastive] = True
+# Load the graph and the masks
+graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, name_yaml, run_type, use_percentage_train=use_percentage_train)
 
 
-    with open('./Data/amz_upu_adjlists.pickle', 'rb') as file:
-        upu = pickle.load(file)
-
-    with open('./Data/amz_usu_adjlists.pickle', 'rb') as file:
-        usu = pickle.load(file)
-
-    with open('./Data/amz_uvu_adjlists.pickle', 'rb') as file:
-        uvu = pickle.load(file)
-
-    edges_list_p = []
-    for i in range(len(upu)):
-        edges_list_p.extend([(i, node) for node in upu[i]])
-    edges_list_p = np.array(edges_list_p)
-    edges_list_p = edges_list_p.transpose()
-
-    edges_list_s = []
-    for i in range(len(upu)):
-        edges_list_s.extend([(i, node) for node in usu[i]])
-    edges_list_s = np.array(edges_list_s)
-    edges_list_s = edges_list_s.transpose()
-
-    edges_list_v = []
-    for i in range(len(upu)):
-        edges_list_v.extend([(i, node) for node in uvu[i]])
-    edges_list_v = np.array(edges_list_v)
-    edges_list_v = edges_list_v.transpose()
-
-    # Creating graph
-    graph = Data(x=torch.tensor(feat_data).float(), 
-                edge_index_v=torch.tensor(edges_list_v), 
-                edge_index_p=torch.tensor(edges_list_p),
-                edge_index_s=torch.tensor(edges_list_s),
-                y=torch.tensor(labels).type(torch.int64),
-                train_mask=train_mask,
-                val_mask=val_mask,
-                test_mask=test_mask,
-                train_mask_contrastive=train_mask_contrastive)
-
-elif params["data"] == "yelp":
-    run_path = f"./Runs/{run_type}/Yelp/{name_yaml}"
-    # Creating a folder for the run files
-    if not os.path.exists(f'{run_path}'):
-        os.makedirs(f'{run_path}')
-        os.makedirs(f'{run_path}/Weights')
-        os.makedirs(f'{run_path}/Plots')
-        os.makedirs(f'{run_path}/Report')
-    # Loading data
-    data_file = loadmat('./Data/YelpChi.mat')
-    labels = data_file['label'].flatten()
-    feat_data = data_file['features'].todense().A
-
-    num_nodes = feat_data.shape[0]
-
-    train_mask = torch.zeros(num_nodes, dtype=torch.bool)
-    val_mask = torch.zeros(num_nodes, dtype=torch.bool)
-    test_mask = torch.zeros(num_nodes, dtype=torch.bool)
-    train_mask_contrastive = torch.zeros(num_nodes, dtype=torch.bool)
-
-    nodes = np.arange(num_nodes)
-    train_nodes, test_val_nodes = train_test_split(nodes, train_size=params["train_data_percentage"], stratify=labels, random_state=0)
-    val_nodes, test_nodes = train_test_split(test_val_nodes, train_size=0.5, stratify=labels[test_val_nodes], random_state=0)
-    train_nodes_contrastive = train_nodes 
-
-    train_mask[train_nodes] = True
-    val_mask[val_nodes] = True
-    test_mask[test_nodes] = True
-    train_mask_contrastive[train_nodes_contrastive] = True
-
-
-    with open('./Data/yelp_rtr_adjlists.pickle', 'rb') as file:
-        upu = pickle.load(file)
-
-    with open('./Data/yelp_rsr_adjlists.pickle', 'rb') as file:
-        usu = pickle.load(file)
-
-    with open('./Data/yelp_rur_adjlists.pickle', 'rb') as file:
-        uvu = pickle.load(file)
-
-    edges_list_p = []
-    for i in range(len(upu)):
-        edges_list_p.extend([(i, node) for node in upu[i]])
-    edges_list_p = np.array(edges_list_p)
-    edges_list_p = edges_list_p.transpose()
-
-    edges_list_s = []
-    for i in range(len(upu)):
-        edges_list_s.extend([(i, node) for node in usu[i]])
-    edges_list_s = np.array(edges_list_s)
-    edges_list_s = edges_list_s.transpose()
-
-    edges_list_v = []
-    for i in range(len(upu)):
-        edges_list_v.extend([(i, node) for node in uvu[i]])
-    edges_list_v = np.array(edges_list_v)
-    edges_list_v = edges_list_v.transpose()
-
-    # Creating graph
-    graph = Data(x=torch.tensor(feat_data).float(), 
-                edge_index_v=torch.tensor(edges_list_v), 
-                edge_index_p=torch.tensor(edges_list_p),
-                edge_index_s=torch.tensor(edges_list_s),
-                y=torch.tensor(labels).type(torch.int64),
-                train_mask=train_mask,
-                val_mask=val_mask,
-                test_mask=test_mask,
-                train_mask_contrastive=train_mask_contrastive)
-
-
+# Load the specified model
 if params["model_name"] == 'Simpler_GCN':
     model = Simpler_GCN(**params['model'])
 elif params["model_name"] == 'Simpler_GCN_Conv':
@@ -231,10 +111,11 @@ elif os.path.exists(f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth'):
 else:
     raise ValueError(f'The model {name_yaml} does not exist or has not a classification head trained.\nTrain the model first or if is the case use the GMM classifier.')
 
-
+# Move the model and graph to cuda if available
 model = model.to(device)
 graph = graph.to(device)
 
+# Get the predictions of the model
 model.eval()
 with torch.no_grad():
     pred = model(graph)
@@ -244,10 +125,10 @@ softmax_fn = nn.Softmax(dim=1)
 pred = softmax_fn(pred)
 pred = pred[:, 1]
 
-# Saving the predictions
-pred = pred.cpu().numpy()
-
+# Create the folder to save the predictions
 if not os.path.exists(f'{run_path}/Predictions'):
     os.makedirs(f'{run_path}/Predictions')
 
+# Saving the predictions
+pred = pred.cpu().numpy()
 np.save(f'{run_path}/Predictions/predictions.npy', pred)

@@ -47,7 +47,7 @@ with open(f'./Setups/SupervisedContrastive/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
 # Load the data and get the path of the run (It also creates the folder structure to save the experiment results)
-graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, "SupervisedContrastive", name_yaml)
+graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, name_yaml, "SupervisedContrastive")
 
 # Load the specified model
 if params["model_name"] == 'Simpler_GCN':

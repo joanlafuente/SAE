@@ -3,11 +3,191 @@ from torch import nn
 from torch_geometric.nn import GCNConv, GAT, GIN, GAE, GraphSAGE, PNA
 from torch_geometric.utils import negative_sampling
 
+"""
+Script containing the models used in the experiments.
+"""
+
+
+class SelfAttention2(nn.Module):
+    def __init__(self, input_size, embed_size, hidden_size, dropout=0):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+
+        # Linear projections for the query, key and value
+        self.fc_q = nn.Linear(input_size, hidden_size) 
+        self.fc_k = nn.Linear(embed_size, hidden_size) 
+        self.fc_v = nn.Linear(embed_size, hidden_size) 
+
+        # Initzializing the scoring function for the attention mechanism
+        self.scoringDot = scoringDot(self.dropout, self.fc_q, self.fc_k, self.fc_v)
+
+    def forward(self, embeds, node_feat):
+        # embeds: batch, 3, embed_size
+        # node_feat: batch, input_size
+
+        # Projecting the embeddings to obtain the values
+        values = torch.tanh(self.fc_v(self.dropout(embeds))) # Batch, 3, hidden_size
+
+        # Getting the attention weights with the scoring function
+        weights = self.scoringDot(embeds, node_feat) # batch, 1, 3
+
+        # Doing the weighted sum of the values
+        result = torch.bmm(weights, values) # batch, 1, hidden_size
+        result = result.squeeze(1) # batch, hidden_size
+        return result
+    
+
+class scoringDot(nn.Module):
+    def __init__(self, dropout, fc_q, fc_k, fc_v):
+        super().__init__()
+        # Saving the linear layers and the dropout layer passed as arguments
+        self.dropout = dropout
+        self.fc_q = fc_q
+        self.fc_k = fc_k
+        self.fc_v = fc_v
+
+    def forward(self, keys, query):
+        # query: batch, input_size
+        # keys: batch, 3, embed_size
+
+        # Projecting the initial node features to obtain the query
+        query = torch.tanh(self.fc_q(self.dropout(query))) # batch, hidden_size
+
+        # Projecting the embeddings to obtain the keys
+        keys = torch.tanh(self.fc_k(self.dropout(keys)))  # batch, 3, hidden_size
+
+        # Obtainin the scores with the dot product
+        query = query.unsqueeze(2) # batch, hidden_size, 1
+        result = torch.bmm(keys, query) # batch, 3, 1
+        result = result.squeeze(2)
+
+        # Normalizing the scores with softmax
+        weights = result.softmax(1) # batch, 3
+        return weights.unsqueeze(1) # batch, 1, 3  This represents the weights of each type of edge
+
+class PNA_model(torch.nn.Module):
+    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_PNA=0):
+        super().__init__()
+        self.activation = nn.Tanh()
+        self.in_norm = nn.BatchNorm1d(in_channels)
+        self.p_norm = nn.BatchNorm1d(out_channels)
+        self.s_norm = nn.BatchNorm1d(out_channels)
+        self.v_norm = nn.BatchNorm1d(out_channels)
+
+        # Parameters of the PNA model 
+        # In this case three different mean message passings are done simultaneously for each type of edge
+        aggregators = ['mean', 'mean', 'mean']
+        scalers = ['identity', 'identity', 'identity']
+        deg = torch.tensor([2, 2, 2])
+
+        # Initialize the PNA model for each type of edge
+        self.gin_p = PNA(in_channels=in_channels, 
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+        self.gin_s = PNA(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+        
+        self.gin_v = PNA(in_channels=in_channels,
+                        hidden_channels=hidden_channels, 
+                        num_layers=num_layers,
+                        out_channels=out_channels,
+                        dropout=dropout_PNA,
+                        aggregators=aggregators,
+                        scalers=scalers,
+                        deg=deg,
+                        )
+
+        # Initialize the attention mechanism
+        self.attention = SelfAttention2(in_channels, out_channels, out_channels)
+
+        # Initialize the classification head
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(out_channels, int(out_channels*2/3)),
+            nn.BatchNorm1d(int(out_channels*2/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*2/3), int(out_channels*1/3)),
+            nn.BatchNorm1d(int(out_channels*1/3)),
+            nn.Tanh(),
+            nn.Dropout(dropout),
+            nn.Linear(int(out_channels*1/3), 2),
+        )
+
+    def load_state_dict(self, state_dict):
+        # Function to load the weights of the model (for perviouly trained models that did not have the scoringDot class)
+        if 'attention.scoringDot.fc_q.weight' not in state_dict:
+            state_dict['attention.scoringDot.fc_q.weight'] = state_dict['attention.fc_q.weight']
+            state_dict['attention.scoringDot.fc_q.bias'] = state_dict['attention.fc_q.bias']
+
+            state_dict['attention.scoringDot.fc_k.weight'] = state_dict['attention.fc_k.weight']
+            state_dict['attention.scoringDot.fc_k.bias'] = state_dict['attention.fc_k.bias']
+
+            state_dict['attention.scoringDot.fc_v.weight'] = state_dict['attention.fc_v.weight']
+            state_dict['attention.scoringDot.fc_v.bias'] = state_dict['attention.fc_v.bias']
+            super().load_state_dict(state_dict)
+
+        else:
+            super().load_state_dict(state_dict)
+
+    def contrastive(self, data):
+        # Function to obtain the node representations with the trained model
+
+        # Load graph data
+        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
+
+        # Batch normalization of the input features
+        x = self.in_norm(x)
+
+        # Appling the PNA model for each type of edge, followed by batch normalization and an activation function
+        x_p = self.gin_p(x, edge_index_p)
+        x_p = self.p_norm(x_p)
+        x_p = self.activation(x_p)
+
+        x_s = self.gin_s(x, edge_index_s)
+        x_s = self.s_norm(x_s)
+        x_s = self.activation(x_s)
+
+        x_v = self.gin_v(x, edge_index_v)
+        x_v = self.v_norm(x_v)
+        x_v = self.activation(x_v)
+
+        # Concate the embeddings (batch, 3, out_channels)
+        x_embed = torch.cat((x_p.unsqueeze(1), x_s.unsqueeze(1), x_v.unsqueeze(1)), 1)
+
+        # Apply attention mechanism
+        x = self.attention(x_embed, x)
+
+        return x
+
+    def forward(self, data):
+        # Obtain the node representations
+        x = self.contrastive(data)
+        # Apply the classification head
+        x = self.classifier(x)
+        return x
+    
+
+
 class GCN(torch.nn.Module):
     def __init__(self, dropout=0):
         super().__init__()
         self.activation = nn.LeakyReLU(0.1)
 
+        # Inizialize the GAT model for each type of edge
         self.gat_p = GAT(in_channels=25, 
                         hidden_channels=150, 
                         num_layers=1,
@@ -24,10 +204,12 @@ class GCN(torch.nn.Module):
                         out_channels=50,
                         v2=True)
 
+        # Projection layer to join the embeddings of the three types of edges
         self.projection = nn.Sequential(
             nn.Linear(150, 150),
         )
 
+        # Classification head
         self.classifier = nn.Sequential(
             nn.Dropout(dropout),
             nn.Linear(150, 75),
@@ -40,8 +222,12 @@ class GCN(torch.nn.Module):
         )
 
     def contrastive(self, data):
+        # Function to obtain the node representations with the trained model
+
+        # Load graph data
         x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
 
+        # Appling the GAT model for each type of edge, followed by an activation function
         x_p = self.gat_p(x, edge_index_p)
         x_p = self.activation(x_p)
 
@@ -51,24 +237,16 @@ class GCN(torch.nn.Module):
         x_v = self.gat_v(x, edge_index_v)
         x_v = self.activation(x_v)
 
+        # Concatenating the three embeddings
         x = torch.cat((x_p, x_s, x_v), 1)
+        # Applying the projection layer
         x = self.projection(x)
         return x
 
     def forward(self, data):
-        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
-
-        x_p = self.gat_p(x, edge_index_p)
-        x_p = self.activation(x_p)
-
-        x_s = self.gat_s(x, edge_index_s)
-        x_s = self.activation(x_s)
-
-        x_v = self.gat_v(x, edge_index_v)
-        x_v = self.activation(x_v)
-
-        x = torch.cat((x_p, x_s, x_v), 1)
-        x = self.projection(x)
+        # Obtain the node representations
+        x = self.contrastive(data)
+        # Apply the classification head
         x = self.classifier(x)
         return x
     
@@ -1458,152 +1636,6 @@ class GraphSAGE_model(torch.nn.Module):
             nn.Dropout(dropout),
             nn.Linear(int(out_channels*1/3), 2),
         )
-
-    def contrastive(self, data):
-        x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v
-        x = self.in_norm(x)
-
-        x_p = self.gin_p(x, edge_index_p)
-        x_p = self.p_norm(x_p)
-        x_p = self.activation(x_p)
-
-        x_s = self.gin_s(x, edge_index_s)
-        x_s = self.s_norm(x_s)
-        x_s = self.activation(x_s)
-
-        x_v = self.gin_v(x, edge_index_v)
-        x_v = self.v_norm(x_v)
-        x_v = self.activation(x_v)
-
-        # Concate the embeddings (batch, 3, out_channels)
-        x_embed = torch.cat((x_p.unsqueeze(1), x_s.unsqueeze(1), x_v.unsqueeze(1)), 1)
-
-        # Apply attention mechanism
-        x = self.attention(x_embed, x)
-
-        return x
-
-    def forward(self, data):
-        x = self.contrastive(data)
-        x = self.classifier(x)
-        return x
-
-class scoringDot(nn.Module):
-    def __init__(self, dropout, fc_q, fc_k, fc_v):
-        super().__init__()
-        self.dropout = dropout
-        self.fc_q = fc_q
-        self.fc_k = fc_k
-        self.fc_v = fc_v
-
-    def forward(self, keys, query):
-        # query: batch, input_size
-        # keys: batch, 3, embed_size
-        query = torch.tanh(self.fc_q(self.dropout(query))) # batch, hidden_size
-        keys = torch.tanh(self.fc_k(self.dropout(keys)))  # batch, 3, hidden_size
-
-        query = query.unsqueeze(2) # batch, hidden_size, 1
-        result = torch.bmm(keys, query) # batch, 3, 1
-        result = result.squeeze(2)
-        weights = result.softmax(1) # batch, 3
-        return weights.unsqueeze(1) # batch, 1, 3  This represents the weights of each type of edge
-
-class SelfAttention2(nn.Module):
-    def __init__(self, input_size, embed_size, hidden_size, dropout=0):
-        super().__init__()
-        self.dropout = nn.Dropout(dropout)
-
-        self.fc_q = nn.Linear(input_size, hidden_size) 
-        self.fc_k = nn.Linear(embed_size, hidden_size) 
-        self.fc_v = nn.Linear(embed_size, hidden_size) 
-
-        self.scoringDot = scoringDot(self.dropout, self.fc_q, self.fc_k, self.fc_v)
-
-    def forward(self, embeds, node_feat):
-        # embeds: batch, 3, embed_size
-        # node_feat: batch, input_size
-
-        values = torch.tanh(self.fc_v(self.dropout(embeds))) # Batch, 3, hidden_size
-        weights = self.scoringDot(embeds, node_feat) # batch, 1, 3
-
-        result = torch.bmm(weights, values) # batch, 1, hidden_size
-        result = result.squeeze(1) # batch, hidden_size
-        return result
-
-class PNA_model(torch.nn.Module):
-    def __init__(self, dropout=0, hidden_channels=10, out_channels=5, num_layers=1, in_channels=25, dropout_PNA=0):
-        super().__init__()
-        self.activation = nn.Tanh()
-        self.in_norm = nn.BatchNorm1d(in_channels)
-        self.p_norm = nn.BatchNorm1d(out_channels)
-        self.s_norm = nn.BatchNorm1d(out_channels)
-        self.v_norm = nn.BatchNorm1d(out_channels)
-
-
-        aggregators = ['mean', 'mean', 'mean']
-        scalers = ['identity', 'identity', 'identity']
-        deg = torch.tensor([2, 2, 2])
-
-        self.gin_p = PNA(in_channels=in_channels, 
-                        hidden_channels=hidden_channels, 
-                        num_layers=num_layers,
-                        out_channels=out_channels,
-                        dropout=dropout_PNA,
-                        aggregators=aggregators,
-                        scalers=scalers,
-                        deg=deg,
-                        )
-        self.gin_s = PNA(in_channels=in_channels,
-                        hidden_channels=hidden_channels, 
-                        num_layers=num_layers,
-                        out_channels=out_channels,
-                        dropout=dropout_PNA,
-                        aggregators=aggregators,
-                        scalers=scalers,
-                        deg=deg,
-                        )
-        
-        self.gin_v = PNA(in_channels=in_channels,
-                        hidden_channels=hidden_channels, 
-                        num_layers=num_layers,
-                        out_channels=out_channels,
-                        dropout=dropout_PNA,
-                        aggregators=aggregators,
-                        scalers=scalers,
-                        deg=deg,
-                        )
-
-        self.attention = SelfAttention2(in_channels, out_channels, out_channels)
-
-
-        self.classifier = nn.Sequential(
-            nn.Dropout(dropout),
-            nn.Linear(out_channels, int(out_channels*2/3)),
-            nn.BatchNorm1d(int(out_channels*2/3)),
-            nn.Tanh(),
-            nn.Dropout(dropout),
-            nn.Linear(int(out_channels*2/3), int(out_channels*1/3)),
-            nn.BatchNorm1d(int(out_channels*1/3)),
-            nn.Tanh(),
-            nn.Dropout(dropout),
-            nn.Linear(int(out_channels*1/3), 2),
-        )
-
-    # Function to load the weights of the model (for perviouly trained models)
-    def load_state_dict(self, state_dict):
-        if 'attention.scoringDot.fc_q.weight' not in state_dict:
-            state_dict['attention.scoringDot.fc_q.weight'] = state_dict['attention.fc_q.weight']
-            state_dict['attention.scoringDot.fc_q.bias'] = state_dict['attention.fc_q.bias']
-
-            state_dict['attention.scoringDot.fc_k.weight'] = state_dict['attention.fc_k.weight']
-            state_dict['attention.scoringDot.fc_k.bias'] = state_dict['attention.fc_k.bias']
-
-            state_dict['attention.scoringDot.fc_v.weight'] = state_dict['attention.fc_v.weight']
-            state_dict['attention.scoringDot.fc_v.bias'] = state_dict['attention.fc_v.bias']
-            super().load_state_dict(state_dict)
-
-        else:
-            super().load_state_dict(state_dict)
 
     def contrastive(self, data):
         x, edge_index_p, edge_index_s, edge_index_v = data.x, data.edge_index_p, data.edge_index_s, data.edge_index_v

@@ -61,7 +61,7 @@ else:
 
 
 # Load the graph, the masks and the run path (It also creates the folder structure to save the experiment results)
-graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, "Supervised", name_yaml,  
+graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, name_yaml, "Supervised",  
                                                                                            use_percentage_train=use_percentage_train)
 
 # Load the specified model

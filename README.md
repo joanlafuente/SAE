@@ -106,6 +106,8 @@ conda env create -f environment.yml
 
 This enviroment will contain all the necesary dependecies to use the code on the repository.
 
+Finally, unzip ``/Data/Graphs.zip`` file on ``/Data`` folder, to have the data prepared and be able to execute the code in the repository.
+
 ### Training models on our pipeline
 The first step is to create a .yaml file with the desired model, approach and data configuration on the corresponding approach file. There are several examples of our experiments in the setups folder. Once this step is done the training proccedure is lunched in the same way for all deep learning approaches.
 

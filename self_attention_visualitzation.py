@@ -53,7 +53,7 @@ else:
         raise ValueError(f'train_data_percentage cannot be greater than {total_train} for the {params["data"]} dataset')
 
 # Load the graph and the masks
-graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, "Supervised", name_yaml, use_percentage_train=use_percentage_train)
+graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, name_yaml, "Supervised", use_percentage_train=use_percentage_train)
 
 # Load the specified model
 if params["model_name"] == 'Simpler_GCN':

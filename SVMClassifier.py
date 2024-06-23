@@ -1,27 +1,41 @@
 import pickle as pkl
 from scipy.io import loadmat
-from sklearn.mixture import GaussianMixture
+from sklearn.svm import SVC
+from sklearn.model_selection import GridSearchCV
 import numpy as np
 from sklearn.metrics import roc_curve
 from openTSNE import TSNE
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from sklearn.metrics import average_precision_score
+from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import classification_report
 from sklearn.metrics import roc_auc_score
 import os
 import sys
 import yaml
 
-# Runs to take into account:
-# Run 17 Yelp Supervised
-# Run 23 Yelp Supervised !!! (Best one) !!!
-# Run 8 2 message Amazon/Yelp Supervised
 
+"""
+Script to train a SVM classifier to detect anomalies on 
+the embeddings of a previously trained model.
+
+In this script there is the code to use different dimensionality reduction techniques,
+but the best results on our experiments were obtained with the Autoencoder.
+
+Interesting experiments to take into account:
+    - Run 17 Yelp Supervised
+    - Run 23 Yelp Supervised !!! (Best one) !!!
+    - Run 8 2 message Amazon/Yelp Supervised
+"""
+
+# Check if the script has the correct input arguments
 if len(sys.argv) != 3:
     raise ValueError('The script needs two arguments: the name of the yaml file and the type of run.\nExample: python SVMClassifier.py name_yaml Supervised\n')
 if sys.argv[2] not in ["Autoencoder", "SelfSupervisedContrastive", "Supervised", "SupervisedContrastive"]:
     raise ValueError(f'{sys.argv[2]} is not a valid run type. Use Autoencoder, SelfSupervisedContrastive, Supervised or SupervisedContrastive.')
+
+
 # Get the name of the yaml file
 name_yaml = sys.argv[1]
 print(f'Running {name_yaml}')
@@ -66,20 +80,25 @@ if not os.path.exists(f'{run_path}/SVM/Results'):
 if not os.path.exists(f'{run_path}/SVM/Predictions'):
     os.makedirs(f'{run_path}/SVM/Predictions')
 
-
+# Load the labels
 labels = data_file['label'].flatten()
 
+# Split the training and validation data
 training_data = embeds[train_mask]
 val_data = embeds[val_mask]
 training_labels = labels[train_mask]
 val_labels = labels[val_mask]
 
-# Concatenate the training and validation data
+# Concatenate the training and validation data 
+# (We do it as later we use cross-validation to tune the hyperparameters and train the SVM)
 training_data = np.concatenate([training_data, val_data], axis=0)
 training_labels = np.concatenate([training_labels, val_labels], axis=0)
 
 
 ### DIMENSIONALITY REDUCTION ###
+# Here we can apply different dimensionality reduction techniques to the embeddings before training the GMM
+# The best results in our exepriments are obtained with the Autoencoder, 
+# but it can also be use PCA, TSNE, LDA, Random Projection, SVD, etc.
 
 # TSNE
 # tsne = TSNE(n_components=2, random_state=42, n_jobs=6, verbose=True)
@@ -110,6 +129,7 @@ training_labels = np.concatenate([training_labels, val_labels], axis=0)
 # Autoencoder (MLP regressor)
 from sklearn.neural_network import MLPRegressor
 
+# Initialize the MLP regressor that will be used as an Autoencoder
 mlp = MLPRegressor(hidden_layer_sizes=(4, ), 
                    solver='adam',
                    activation='identity',
@@ -125,20 +145,27 @@ mlp = MLPRegressor(hidden_layer_sizes=(4, ),
 #     training_data_epoch = training_data[idx].copy() 
 #     mlp.partial_fit(drop(torch.tensor(training_data_epoch)).numpy(), training_data_epoch)
 
+# Training the autoencoder with the normal class
 # mlp.fit(training_data[training_labels == 0], training_data[training_labels == 0])
+
+# Training the autoencoder with the whole training data
 mlp.fit(training_data, training_data)
 
+# Get the hidden layer of the autoencoder
 mlp_hidden = mlp.coefs_[0]
+
+# Apply the hidden layer to the training data to reduce the dimensionality
 training_data = np.dot(training_data, mlp_hidden)
+
 # Plot the loss curve
 plt.plot(range(1, len(mlp.loss_curve_)+1), mlp.loss_curve_)
-plt.savefig("MLP_Loss.png")
+plt.savefig(f"{run_path}/SVM/Plots/MLP_Loss.png")
 plt.close()
 
 
 # Plot the features after dimensionality reduction
 if training_data.shape[1] >= 2:
-    # Plot the t-SNE of the training data
+    # If it has more than 2 dimensions, we plot the first two
     plt.scatter(training_data[training_labels == 0][:, 0], training_data[training_labels == 0][:, 1], label='Normal')
     plt.scatter(training_data[training_labels == 1][:, 0], training_data[training_labels == 1][:, 1], label='Anomaly')
     plt.legend()
@@ -146,18 +173,14 @@ if training_data.shape[1] >= 2:
     plt.close()
 
 
-
-# Train SVM
-from sklearn.svm import SVC
-from sklearn.model_selection import GridSearchCV
-
-# Define the parameter grid
+# Define the parameter grid for the SVM grid search
 param_grid = {
     'C': [0.1, 1, 10, 100],# 1000],
     'gamma': [1, 0.1, 0.01, 0.001], # 0.0001],
     'kernel': ['rbf']
 }
 
+# Train the SVM with cross-validation to tune the hyperparameters
 grid = GridSearchCV(SVC(), scoring='roc_auc', param_grid=param_grid, refit=True, verbose=3, n_jobs=16)
 grid.fit(training_data, training_labels)
 
@@ -165,38 +188,25 @@ grid.fit(training_data, training_labels)
 best_model = grid.best_estimator_
 print("Best parameters: ", grid.best_params_)
 
-# # Train gbc	Gradient Boosting Classifier
-# from sklearn.ensemble import GradientBoostingClassifier
-# from sklearn.model_selection import GridSearchCV
 
-# # Define the parameter grid
-# param_grid = {
-#     'n_estimators': [50, 100, 200, 300],
-#     'learning_rate': [0.1, 0.01, 0.001],
-#     'max_depth': [3, 5, 7, 9]
-# }
+### Computing the test metrics
+# Apply the dimensionality reduction to the test data
+test_data = np.dot(embeds[test_mask], mlp_hidden)
 
-# grid = GridSearchCV(GradientBoostingClassifier(), scoring='roc_auc', param_grid=param_grid, refit=True, verbose=3, n_jobs=10)
-# grid.fit(training_data, training_labels)
-
-# # Load the best model
-# best_model = grid.best_estimator_
-# print("Best parameters: ", grid.best_params_)
-
-# Compute the test metrics
+# For the other dimensionality reduction techniques:
 # test_data = tsne.transform(embeds[test_mask])
 # test_data = pca.transform(embeds[test_mask])
 # test_data = lda.transform(embeds[test_mask])
 # test_data = rp.transform(embeds[test_mask])
 # test_data = svd.transform(embeds[test_mask])
-test_data = np.dot(embeds[test_mask], mlp_hidden)
 
+# Get the test labels, predictions and probabilities
 test_labels = labels[test_mask]
 test_preds = best_model.predict(test_data)
 test_probs = best_model.decision_function(test_data)
 
+# Computing test metrics, Recall, Precision and F1-score
 print(classification_report(test_labels, test_preds))
-
 report2save = classification_report(test_labels, test_preds, output_dict=True)
 
 # ROC-AUC
@@ -207,6 +217,7 @@ report2save["ROC-AUC"] = roc_auc
 # ROC curve test
 fpr, tpr, thresholds = roc_curve(test_labels, test_probs)
 
+# Plotitng the ROC curve
 plt.figure()
 lw = 2
 plt.plot(
@@ -228,9 +239,9 @@ plt.close()
 
 
 # Precision recall curve
-from sklearn.metrics import precision_recall_curve
 precision, recall, thresholds = precision_recall_curve(test_labels, test_probs)
 
+# Plotting the Precision-Recall curve
 plt.figure()
 lw = 2
 plt.plot(
@@ -249,11 +260,11 @@ plt.savefig(f"{run_path}/SVM/Plots/Precision_Recall_Curve.png")
 plt.close()
 
 # Average Precision
-# average_precision = average_precision_score(test_labels, test_data)
 average_precision = average_precision_score(test_labels, test_probs)
 print("Average Precision: ", average_precision)
 report2save["AveragePrecision"] = average_precision
 
+# Save the test metrics
 with open(f"{run_path}/SVM/Results/SVM_results.txt", "w") as f:
     f.write(str(report2save))
 

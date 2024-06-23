@@ -3,25 +3,39 @@ from scipy.io import loadmat
 from sklearn.mixture import GaussianMixture
 import numpy as np
 from sklearn.metrics import roc_curve
+from sklearn.metrics import precision_recall_curve
 from openTSNE import TSNE
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from sklearn.metrics import average_precision_score
 from sklearn.metrics import classification_report
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import StratifiedKFold
 import os
 import sys
 import yaml
 
-# Runs to take into account:
-# Run 17 Yelp Supervised
-# Run 23 Yelp Supervised !!! (Best one) !!!
-# Run 8 2 message Amazon/Yelp Supervised
 
+"""
+Script to detect anomalies on the embeddings of a previously trained model, 
+by reducing the dimensionality of the embeddings to 1 and using a threshold 
+to classify the data.
+
+In this script there is the code to use different dimensionality reduction techniques,
+but the best results on our experiments were obtained with the Autoencoder.
+
+Interesting experiments to take into account:
+    - Run 17 Yelp Supervised
+    - Run 23 Yelp Supervised !!! (Best one) !!!
+    - Run 8 2 message Amazon/Yelp Supervised
+"""
+
+# Check if the script has the correct input arguments
 if len(sys.argv) != 3:
     raise ValueError('The script needs two arguments: the name of the yaml file and the type of run.\nExample: python TresholdClassifier.py name_yaml Supervised\n')
 if sys.argv[2] not in ["Autoencoder", "SelfSupervisedContrastive", "Supervised", "SupervisedContrastive"]:
     raise ValueError(f'{sys.argv[2]} is not a valid run type. Use Autoencoder, SelfSupervisedContrastive, Supervised or SupervisedContrastive.')
+
 # Get the name of the yaml file
 name_yaml = sys.argv[1]
 print(f'Running {name_yaml}')
@@ -66,20 +80,25 @@ if not os.path.exists(f'{run_path}/Threshold/Results'):
 if not os.path.exists(f'{run_path}/Threshold/Predictions'):
     os.makedirs(f'{run_path}/Threshold/Predictions')
 
-
+# Load the labels
 labels = data_file['label'].flatten()
 
+# Get the training and validation data
 training_data = embeds[train_mask]
 val_data = embeds[val_mask]
 training_labels = labels[train_mask]
 val_labels = labels[val_mask]
 
 # Concatenate the training and validation data
+# (We do it as later we use cross-validation)
 training_data = np.concatenate([training_data, val_data], axis=0)
 training_labels = np.concatenate([training_labels, val_labels], axis=0)
 
 
 ### DIMENSIONALITY REDUCTION ###
+# Here we can apply different dimensionality reduction techniques to the embeddings before training the GMM
+# The best results in our exepriments are obtained with the Autoencoder, 
+# but it can also be use PCA, TSNE, LDA, Random Projection, SVD, etc.
 
 # TSNE
 # tsne = TSNE(n_components=2, random_state=42, n_jobs=6, verbose=True)
@@ -110,6 +129,7 @@ training_labels = np.concatenate([training_labels, val_labels], axis=0)
 # Autoencoder (MLP regressor)
 from sklearn.neural_network import MLPRegressor
 
+# Initialize the MLP regressor that will be used as an autoencoder
 mlp = MLPRegressor(hidden_layer_sizes=(1, ), 
                    solver='adam',
                    activation='identity',
@@ -125,40 +145,49 @@ mlp = MLPRegressor(hidden_layer_sizes=(1, ),
 #     training_data_epoch = training_data[idx].copy() 
 #     mlp.partial_fit(drop(torch.tensor(training_data_epoch)).numpy(), training_data_epoch)
 
+# Training the autoencoder with the normal class
 # mlp.fit(training_data[training_labels == 0], training_data[training_labels == 0])
+
+# Training the autoencoder with the whole training data
 mlp.fit(training_data, training_data)
 
+# Get the hidden layer of the autoencoder
 mlp_hidden = mlp.coefs_[0]
+
+# Apply the hidden layer to the training data to reduce the dimensionality
 training_data = np.dot(training_data, mlp_hidden)
+
 # Plot the loss curve
 plt.plot(range(1, len(mlp.loss_curve_)+1), mlp.loss_curve_)
 plt.savefig(f"{run_path}/Threshold/MLP_Loss.png")
 plt.close()
 
-
-# Plot the features after dimensionality reduction
+# Histogram after dimensionality reduction
 plt.hist(training_data[training_labels == 1], bins=50, alpha=0.5, label='Anomaly')
 plt.hist(training_data[training_labels == 0], bins=50, alpha=0.5, label='Normal')
 plt.legend()
 plt.savefig(f"{run_path}/Threshold/Plots/dimensionality_reduction.png")
 plt.close()
     
-
+# Check wether the anomaly class has usually higher or lower values than the normal class
+# This is important because we will use a threshold to classify the data
 DATA_MADE_NEGATIVE = False
+# We compute the ROC-AUC, if the result is less than 0.5, it means that is worse than random, 
+# in most cases it is because the anomaly class has smaller values than the normal class ussually
+# so we multiply the data by -1, producing that the anomaly class has higher values than the normal class
 roc_auc = roc_auc_score(training_labels, training_data)
 if roc_auc < 0.5:
     training_data = -training_data
     DATA_MADE_NEGATIVE = True
 
-from sklearn.metrics import roc_curve
 
+# Roc curve training data
 fpr, tpr, thresholds = roc_curve(training_labels, training_data)
 
-# Precision Recall curve
-from sklearn.metrics import precision_recall_curve
+# Precision Recall curve training data
 precision, recall, _ = precision_recall_curve(training_labels, training_data)
 
-
+# ROC curve plot
 plt.figure()
 lw = 2
 plt.plot(
@@ -179,7 +208,7 @@ plt.savefig(f"{run_path}/Threshold/Plots/ROC_Curve_GNN.png")
 plt.close()
 
 
-# Precision Recall curve
+# Precision Recall curve plot
 plt.figure()
 lw = 2
 plt.plot(
@@ -198,8 +227,7 @@ plt.legend(loc="lower right")
 plt.savefig(f"{run_path}/Threshold/Plots/Precision_Recall_Curve_GNN.png")
 plt.close()
 
-# K-folds cross validation
-from sklearn.model_selection import StratifiedKFold
+# K-folds cross validation to get the best threshold
 kf = StratifiedKFold(n_splits=50)
 dict_splits_results = {}
 
@@ -210,19 +238,21 @@ for i, (train_index, test_index) in enumerate(kf.split(training_data, y=training
     X_train2, X_test2 = training_data[train_index], training_data[test_index]
     y_train2, y_test2 = training_labels[train_index], training_labels[test_index]
 
+    # Compute the ROC curve
     fpr, tpr, thresholds = roc_curve(y_train2, X_train2)
 
     # Find the best threshold (Nearest to the top left corner)
     best_threshold = thresholds[np.argmin(np.sqrt(fpr ** 2 + (1 - tpr) ** 2))]
 
+    # Save the best threshold
     best_thresholds.append(best_threshold)
+
     # Get the results on the validation set
     y_pred2 = X_test2 < best_threshold
     dict_splits_results[f"split_{i}_val"] = classification_report(y_test2, y_pred2, target_names=["Negative", "Positive"], output_dict=True)
 
 
 # Make the mean of the results on the splits
-
 print("Results k fold val")
 precision_neg = []
 precision_pos = []
@@ -238,7 +268,7 @@ for key in dict_splits_results.keys():
     f1_neg.append(dict_splits_results[key]["Negative"]["f1-score"])
     f1_pos.append(dict_splits_results[key]["Positive"]["f1-score"])
 
-# Plot the boxplot of the diferent tresholds in the different splits
+# boxplot of the diferent tresholds in the different splits
 plt.figure(figsize=(4, 5))
 plt.boxplot(best_thresholds, 
             showmeans=True, 
@@ -284,27 +314,34 @@ plt.close()
 
 
 
-# Compute the test metrics
+### Computing the test metrics
+# Apply the dimensionality reduction to the test data
+test_data = np.dot(embeds[test_mask], mlp_hidden)
+
+# For the other dimensionality reduction techniques:
 # test_data = tsne.transform(embeds[test_mask])
 # test_data = pca.transform(embeds[test_mask])
 # test_data = lda.transform(embeds[test_mask])
 # test_data = rp.transform(embeds[test_mask])
 # test_data = svd.transform(embeds[test_mask])
-test_data = np.dot(embeds[test_mask], mlp_hidden)
 
+# Get the test labels
 test_labels = labels[test_mask]
 
+
+# If the anomaly class usually has lower values than the normal class, we multiply the data by -1
 if DATA_MADE_NEGATIVE:
     test_data = -test_data
+
+# Apply the threshold to classify the data
 test_preds = test_data > best_threshold
 
 
-
+# Computing the classification report on test data, which includes precision, recall and f1-score for each class 
 print(classification_report(test_labels, test_preds))
-
 report2save = classification_report(test_labels, test_preds, output_dict=True)
 
-# ROC-AUC
+# ROC-AUC score
 roc_auc = roc_auc_score(test_labels, test_data)
 print("ROC-AUC: ", roc_auc)
 report2save["ROC-AUC"] = roc_auc
@@ -312,7 +349,7 @@ report2save["ROC-AUC"] = roc_auc
 # ROC curve test
 fpr, tpr, thresholds = roc_curve(test_labels, test_data)
 
-
+# Roc curve plot
 plt.figure()
 lw = 2
 plt.plot(
@@ -332,11 +369,12 @@ plt.legend(loc="lower right")
 plt.savefig(f"{run_path}/Threshold/Plots/ROC_Curve_TEST.png")
 plt.close()
 
-# Average Precision
+# Average Precision test set
 average_precision = average_precision_score(test_labels, test_data)
 print("Average Precision: ", average_precision)
 report2save["AveragePrecision"] = average_precision
 
+# Storing the test metrics
 with open(f"{run_path}/Threshold/Results/Threshold_results.txt", "w") as f:
     f.write(str(report2save))
 
