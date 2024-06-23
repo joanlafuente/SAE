@@ -25,6 +25,26 @@ import wandb
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 def preprocess_data(params, name_yaml, approach, use_percentage_train=1):
+    """
+    Function to preprocess the data, make the train, validation and test splits,
+    and create the graph data structure. 
+    The function also creates the path and folders to save the run files.   
+
+    Args:
+        params (dict): A dictionary containing the parameters of the experiment.
+        name_yaml (str): The name of the YAML file.
+        approach (str): The approach of the experiment.
+        use_percentage_train (float, optional): The percentage of training data to use. Defaults to 1.
+
+    Returns:
+        tuple: A tuple containing the following elements:
+            - graph (torch_geometric.data.Data): The graph data structure.
+            - run_path (str): The path to save the run files.
+            - train_mask (torch.Tensor): The mask for the training set.
+            - val_mask (torch.Tensor): The mask for the validation set.
+            - test_mask (torch.Tensor): The mask for the test set.
+            - train_mask_contrastive (torch.Tensor): The mask for the contrastive learning set.
+    """
     if params["data"] == "amz":
         # Creating the path to save the run files
         run_path = f"./Runs/{approach}/Amazon/{name_yaml}"
@@ -266,7 +286,7 @@ def eval_node_classifier(model, graph, mask):
     return acc, f1, pred
 
 def mask_node_atributes(graph, percentage_n=0.1, percentage_e=0.1):
-    # Masking the node attributes
+    # Masking the node attributes as in GraphCL
     drop = nn.Dropout(percentage_n)
     graph = copy.deepcopy(graph)
     graph.x = drop(graph.x)
@@ -329,6 +349,23 @@ def eval_node_embedder_samp(model, graph, mask, criterion, percentage_n=0.1, per
 
 
 def train_node_embedder(model, graph, optimizer, criterion, config, name_model='best_model_contrastive.pth'):
+    """
+    Function to train the node embedder model using a self supervised contrastive learning approach.
+    It has two pipeline variations, one using the augmentations from GraphCL and the other using
+    a noise sampling approach instead of masking node features.
+
+    Args:
+        model (nn.Module): The model.
+        graph (torch_geometric.data.Data): The input graph data.
+        optimizer (torch.optim.Optimizer): The optimizer for training the model.
+        criterion (nn.Module): The loss criterion for training the model.
+        config (dict): Configuration parameters for training.
+        name_model (str, optional): The name of the saved model file. Defaults to 'best_model_contrastive.pth'.
+
+    Returns:
+        nn.Module: The trained node embedder model.
+    """
+
     # Get the transformation to apply to the graph
     if config["self_supervised"]["augmentations"] == 'dropout':
         percentage = config["self_supervised"]["percentage_masking_features"]
@@ -473,6 +510,19 @@ def loss_fn_SimCLR(proj_1, proj_2):
 
 def train_node_embedder_supervised(model, graph, optimizer, config, 
                                    name_model='best_model_contrastive_sup.pth'):
+    """
+    Trains a node embedder model using supervised contrastive learning (Triplet loss).
+
+    Args:
+        model (torch.nn.Module): The model.
+        graph (torch_geometric.data.Data): The input graph data.
+        optimizer (torch.optim.Optimizer): The optimizer for training the model.
+        config (dict): A dictionary containing the training configuration parameters.
+        name_model (str, optional): The name of the file to save the best model. Defaults to 'best_model_contrastive_sup.pth'.
+
+    Returns:
+        torch.nn.Module: The trained node embedder model.
+    """
     labels = graph.y
     
     # Loadin cosine distance
@@ -609,6 +659,22 @@ def train_node_classifier_minibatches(model, graph, optimizer, config,
                                       criterion=None, only_head=False,
                                       self_supervised=False,
                                       name_model='best_model_clasifier.pth'):
+    """
+    Trains a node classifier model using batches.
+
+    Args:
+        model (torch.nn.Module): The node classifier model.
+        graph (torch_geometric.data.Data): The input graph data.
+        optimizer (torch.optim.Optimizer): The optimizer for training the model.
+        config (dict): Configuration parameters for training.
+        criterion (torch.nn.Module, optional): The loss function. If not provided, CrossEntropyLoss is used.
+        only_head (bool, optional): Whether if only training the head of the model. Default is False. Only for to identify the run in wandb.
+        self_supervised (bool, optional): Whether if the model was pretrained witha a self-supervised method. Default is False. Only for to identify the run in wandb.
+        name_model (str, optional): The name of the saved model file. Default is 'best_model_clasifier.pth'.
+
+    Returns:
+        torch.nn.Module: The trained node classifier model.
+    """
     labels = graph.y
 
     # If no loss is provided, use CrossEntropyLoss
@@ -722,6 +788,24 @@ def train_node_classifier_minibatches(model, graph, optimizer, config,
 
 def train_node_embedder_and_classifier_supervised(model, graph, optimizer, criterion, 
                                                   config, name_model='best_model.pth'):
+    """
+    Trains a node embedder and classifier model, it uses two losses (Triplet loss 
+    for the embbedings and the provided one for classification).
+
+    Both losses are weighted by two parameters in the configuration file ('weight_triplet',
+    'weight_classification') and backpropagated at the same time.
+
+    Args:
+        model (torch.nn.Module): The node embedder and classifier model.
+        graph (torch_geometric.data.Data): The input graph data.
+        optimizer (torch.optim.Optimizer): The optimizer for model parameter updates.
+        criterion (torch.nn.Module): The loss criterion for classification.
+        config (dict): A dictionary containing the configuration parameters.
+        name_model (str, optional): The name of the saved model file. Defaults to 'best_model.pth'.
+
+    Returns:
+        torch.nn.Module: The trained node embedder and classifier model.
+    """
     labels = graph.y
     # Load the weight given for each loss
     weight_triplet = config["weight_triplet"]
@@ -894,6 +978,25 @@ def train_node_autoencoder(model, graph, optimizer, config,
                                       label2use=0,
                                       criterion=None, 
                                       name_model='best_model_clasifier.pth'):
+    """
+    Trains a node autoencoder model on a graph. The model is trained to reduce the reconstruction error
+    of the nodes with a specific label. The reconstruction error of the other classes can be increased
+    by setting the weighting 'alpha' parameter in the configuration file to a value bigger than 0. Alpha 
+    is the weight that is given to the reconstruction loss that we are trying to increase, the rest of 
+    the classes.
+
+    Args:
+        model (nn.Module): The node autoencoder model.
+        graph (torch_geometric.data.Data): The input graph.
+        optimizer (torch.optim.Optimizer): The optimizer for training the model.
+        config (dict): A dictionary containing the configuration parameters.
+        label2use (int, optional): The label to use for reducing the reconstruction error. Defaults to 0.
+        criterion (nn.Module, optional): The loss criterion. If None, MSELoss is used. Defaults to None.
+        name_model (str, optional): The name of the file to save the best model. Defaults to 'best_model_clasifier.pth'.
+
+    Returns:
+        nn.Module: The trained node autoencoder model.
+    """
     labels = graph.y
 
     # If no loss is provided, use MSELoss
@@ -1016,6 +1119,21 @@ def train_node_autoencoder(model, graph, optimizer, config,
 
 def train_autoencoder_edges(model, graph, optimizer, config, 
                             name_model='best_model_clasifier.pth'):
+    """
+    Trains an edge autoencoder model, it tries to predict the three types of edges separately during 
+    training. The loss must be implented on the model.
+
+    Args:
+        model (torch.nn.Module): The edge autoencoder model.
+        graph (torch_geometric.data.Data): The input graph data.
+        optimizer (torch.optim.Optimizer): The optimizer for training the model.
+        config (dict): A dictionary containing configuration parameters.
+        name_model (str, optional): The name of the saved model file. Defaults to 'best_model_clasifier.pth'.
+
+    Returns:
+        torch.nn.Module: The trained edge autoencoder model.
+    """
+    
     # Init the variables for the early stopping
     best_val_loss = float('inf')
     

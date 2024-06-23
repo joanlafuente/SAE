@@ -28,6 +28,15 @@ from utils import *
 from models import GCN, Simpler_GCN, PNA_Edge_feat, Simpler_GCN2, Simpler_GCN_Conv, GCN_Att, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat, GAT_BatchNormalitzation, GAT_SELU_Alphadrop, GIN_ReLU, GIN_tanh, GraphSAGE_model, PNA_model, PNA_model_2
 import yaml
 
+"""
+The script is used to train a model on the Yelp or Amazon 
+dataset for anomaly detection in a supervised manner.
+
+There are two pipelines implemented:
+    - Classical supervised learning using Cross entropy loss
+    - Combining Cross entropy loss with triplet loss for contrastive learning at the same time
+        So, We obtain a model capable of generating embeddings for the nodes and classifying them
+"""
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('Device:', device)
@@ -51,7 +60,7 @@ else:
         raise ValueError(f'train_data_percentage cannot be greater than {total_train} for the {params["data"]} dataset')
 
 
-# Load the graph, the masks and the run path
+# Load the graph, the masks and the run path (It also creates the folder structure to save the experiment results)
 graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, "Supervised", name_yaml,  
                                                                                            use_percentage_train=use_percentage_train)
 

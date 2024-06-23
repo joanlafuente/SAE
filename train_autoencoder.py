@@ -28,6 +28,14 @@ from sklearn.manifold import TSNE
 from utils import *
 from models import GCN_Att_Not_res_Autoencoder, GAE_model, GAE_model_GAT, GAE_model_PNA
 
+"""
+The script is used to train a model on the Yelp or Amazon 
+dataset for anomaly detection.
+
+There are to pipelines implented to train the model:
+    - Train an edge autoencoder and then the classification head
+    - Train an node autoencoder
+"""
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('Device:', device)
@@ -40,10 +48,10 @@ print(f'Running {name_yaml}')
 with open(f'./Setups/Autoencoder/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
-# Load the data and get the path of the run
+# Load the data and get the path of the run (It also creates the folder structure to save the experiment results)
 graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, "Autoencoder", name_yaml)
 
-# Load the model
+# Load the specified model
 if params["model_name"] == 'GCN_Att_Not_res_Autoencoder':
     model = GCN_Att_Not_res_Autoencoder(**params['model'])
 elif params["model_name"] == 'GAE_model':
@@ -56,7 +64,7 @@ else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 
 
-# Load the model and data to cuda if available
+# Move the model into cuda if available
 model = model.to(device)
 graph = graph.to(device)
 
@@ -99,9 +107,11 @@ if "train_edge_autoencoder" in params and params["train_edge_autoencoder"]:
         out = out.cpu().numpy()
         labels = graph.y.cpu().numpy()
 
-    # Save the embeddings and masks used for training
+    # Save the embeddings
     with open(f'{run_path}/Pickles/embeds_contr_sup_{name_yaml}.pkl', 'wb') as file:
         pkl.dump(out, file)
+        
+    # Save the masks used for training, validation and testing
     with open(f"{run_path}/Pickles/train_test_val_masks_{name_yaml}.pkl", "wb") as file:
         pkl.dump([train_mask, val_mask, test_mask, train_mask_contrastive], file)
 

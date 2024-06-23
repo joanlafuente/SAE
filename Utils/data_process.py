@@ -5,8 +5,9 @@ import scipy.sparse as sp
 from tqdm import tqdm
 
 """
-	Read data and save the adjacency matrices to adjacency lists
+	Reads data and save the adjacency matrices to adjacency lists
 """
+
 def sparse_to_adjlist(sp_matrix, filename):
 	"""
 	Transfer sparse matrix to adjacency list
@@ -27,7 +28,6 @@ def sparse_to_adjlist(sp_matrix, filename):
 
 
 if __name__ == "__main__":
-
 	yelp = loadmat('./Data/YelpChi.mat')
 	net_rur = yelp['net_rur']
 	net_rtr = yelp['net_rtr']

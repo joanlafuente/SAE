@@ -6,15 +6,17 @@ from torch_geometric.data import Dataset
 from torch_geometric.nn import GCNConv, GAT
 import torch.nn.functional as F
 from scipy.io import loadmat
-import pickle
+import pickle as pkl
 import numpy as np
 from tqdm import tqdm
 from sklearn.metrics import f1_score
 import random
 
-from sklearn.metrics import confusion_matrix
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from sklearn.metrics import confusion_matrix
+from sklearn.manifold import TSNE
+import matplotlib.pyplot as plt
 import seaborn as sns
 import copy
 import os
@@ -24,6 +26,19 @@ import sys
 from utils import *
 from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAE_model, PNA_model, PNA_model_self_supervised
 
+"""
+The script is used to train a model on the Yelp or Amazon dataset 
+for anomaly detection using a contrastive self-supervised approach.
+
+It first trains a model to predict the embeddings of the nodes 
+using GraphCL paper aproach. Also, there is the option to use
+a variation of this method that instead of masking node atributes 
+on the augmentation step it adds random noise to some atributes.
+
+After training the node embedder part of the model, the script trains
+the classification head of the model, to predict wheter or not a node 
+is an anomaly, freezing the rest of model parameters. 
+"""
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print('Device:', device)
@@ -36,8 +51,10 @@ print(f'Running {name_yaml}')
 with open(f'./Setups/SelfSupervisedContrastive/{name_yaml}.yaml') as file:
     params = yaml.load(file, Loader=yaml.FullLoader)
 
+# Load the graph, the masks and the run path (It also creates the folder structure to save the experiment results)
 graph, run_path, train_mask, val_mask, test_mask, train_mask_contrastive = preprocess_data(params, "SelfSupervisedContrastive", name_yaml)
 
+# Load the specified model
 if params["model_name"] == 'Simpler_GCN':
     model = Simpler_GCN(**params['model'])
 elif params["model_name"] == 'Simpler_GCN_Conv':
@@ -57,13 +74,15 @@ elif params["model_name"] == 'PNA_model_self_supervised':
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 
+# Move the model and the graph to cuda if available
 model = model.to(device)
-
 graph = graph.to(device)
 
-
+# Define the optimizer and the loss function
 optimizer_gcn = torch.optim.AdamW(model.parameters(), lr=params["lr"], weight_decay=params["weight_decay"])
 criterion = loss_fn_SimCLR
+
+# Train the self-supervised part of the model
 if params["train_contrastive"]:
     model = train_node_embedder(model, graph, optimizer_gcn, criterion, config=params,
                                 name_model=f'{run_path}/Weights/contr_sup_{name_yaml}.pth')
@@ -78,29 +97,25 @@ with torch.no_grad():
     labels = graph.y.cpu().numpy()
 
 # Save the embeddings
-import pickle as pkl
 with open(f'{run_path}/Pickles/embeds_contr_sup_{name_yaml}.pkl', 'wb') as file:
     pkl.dump(out, file)
 
+# Save the masks used for training, validation and testing
 with open(f"{run_path}/Pickles/train_test_val_masks_{name_yaml}.pkl", "wb") as file:
     pkl.dump([train_mask, val_mask, test_mask, train_mask_contrastive], file)
 
 
-# Plot the embeddings
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
-
+# If the embeddings are not 2D, we apply t-SNE to reduce them to 2D
 if out.shape[1] > 2:
     # Applying t-SNE
     tsne = TSNE(n_components=2, random_state=42)
     X_tsne = tsne.fit_transform(out[3305:])  # Assuming the first 3304 are unlabeled and hence excluded
 
-
     # Separating the reduced features by their labels for plotting
     X_tsne_benign = X_tsne[labels[3305:] == 0]
     X_tsne_fraudulent = X_tsne[labels[3305:] == 1]
 
-    # Plotting
+    # Plotting all the nodes embbdings
     plt.figure(figsize=(10, 6))
     plt.scatter(X_tsne_benign[:, 0], X_tsne_benign[:, 1], label='Benign (Class 0)', alpha=0.5)
     plt.scatter(X_tsne_fraudulent[:, 0], X_tsne_fraudulent[:, 1], label='Fraudulent (Class 1)', alpha=0.5)
@@ -197,28 +212,39 @@ else:
     plt.close()
 
 
+# Train the classification head of the model
 if params["train_head"]:
     # Frozing all the model parameters that are not on the classification head
     for name, param in model.named_parameters():
         if 'classifier' not in name:
             param.requires_grad = False
 
+    # Get the parameters that are not contained in the classifier
     parameters = filter(lambda p: p.requires_grad, model.parameters())
 
+    # Define the optimizer
     optimizer_gcn = torch.optim.AdamW(parameters, lr=params["lr"], weight_decay=params["weight_decay"])
-
+    
+    # Compute the class weights for the loss function
+    # In order to balance the classes weight on the loss function
     train_samples = graph.y[graph.train_mask]
     weight_for_class_0 = len(train_samples) / (len(train_samples[train_samples == 0]) * 2)
     weight_for_class_1 = len(train_samples) / (len(train_samples[train_samples == 1]) * 2)
     criterion = nn.CrossEntropyLoss(weight=torch.tensor([weight_for_class_0, weight_for_class_1]).to(device))
+
+    # Train the model classification head
     model = train_node_classifier_minibatches(model=model, graph=graph, config=params, 
                                             criterion=criterion, optimizer=optimizer_gcn, self_supervised=True, 
                                             name_model=f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth')
+    
+    # Load the best model
     model.load_state_dict(torch.load(f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth'))
 
+    # Evaluate the model and get the predictions
     test_acc, f1, predictions = eval_node_classifier(model, graph, graph.test_mask)
     print(f'Test Acc: {test_acc:.3f}, Test F1: {f1:.3f}')
 
+    # Compute the confusion matrix
     conf_matrix = confusion_matrix(graph.y[graph.test_mask].cpu().numpy(),
                                 predictions[graph.test_mask].cpu().numpy())
     sns.heatmap(conf_matrix, annot=True, fmt='d')
@@ -227,9 +253,11 @@ if params["train_head"]:
     plt.savefig(f'{run_path}/Plots/cm_contr_sup_{name_yaml}.png')
     plt.close()
 
-    from sklearn.metrics import classification_report
+    # Compute the classification report, it contains the precision, recall, f1-score for each class
     report = classification_report(graph.y[graph.test_mask].cpu().numpy(), predictions[graph.test_mask].cpu().numpy(), output_dict=True)
+    # Compute the ROC AUC score
     report["ROC_AUC"] = compute_ROC_AUC(model, graph, graph.test_mask)
     
+    # Save the classification matrics 
     with open(f'{run_path}/Report/contr_sup_{name_yaml}.txt', 'w') as file:
         file.write(str(report))
