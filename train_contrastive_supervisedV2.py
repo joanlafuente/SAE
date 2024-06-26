@@ -24,7 +24,7 @@ import sys
 
 
 from utils import *
-from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat
+from models import GCN, Simpler_GCN, Simpler_GCN_Conv, GCN_Att, Simpler_GCN2, GCN_Att_Drop_Multihead, GCN_Att_Not_res, GAT_Edge_feat, PNA_model
 
 """
 The script is used to train a model on the Yelp or Amazon 
@@ -64,6 +64,8 @@ elif params["model_name"] == 'GCN_Att_Not_res':
     model = GCN_Att_Not_res(**params['model'])
 elif params["model_name"] == 'GAT_Edge_feat':
     model = GAT_Edge_feat(**params['model'])
+elif params["model_name"] == 'PNA_model':
+    model = PNA_model(**params['model'])
 else:
     raise ValueError(f'{params["model_name"]} is not a valid model name')
 
