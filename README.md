@@ -3,7 +3,10 @@
 ![alt text](Images/pipeline.png)
 
 ## Project overview
-<!-- Afegir un intro -->
+
+Detecting anomalies in graph-structured data is a crucial task for preventing cyber fraud, including fake reviews and bank scams, which can have significant financial repercussions. This project introduces a novel architecture that leverages Graph Neural Networks (GNNs) to enhance anomaly detection in graphs, providing a robust solution to these challenges.
+
+Our method offers significant improvements in detecting fraudulent activities, thereby enhancing data integrity and maintaining consumer trust. The ability to accurately detect anomalies in graph-structured data can help organizations prevent various forms of cyber fraud, safeguarding financial interests and upholding the credibility of digital platforms.
 
 Additional information from the project is provided on the project [report](possarLink).
 
@@ -127,13 +130,18 @@ elif params["model_name"] == 'Name Assigned to the model for the .yaml files':
 ```
 
 ### Executing The Spotter
-*Add a short explantion*
+Using the web app is straightforward. Navigate to The Spotter folder and execute the app.py file inside the folder using the following command line. 
+```sh
+cd ./The_Spotter/
+python3 app.py
+```
+This will yield an HTTP address in the console, by clicking in this address it will execute the app in a web browser in a new tab.
 
 
 ## Contributors
 Joan Lafuente Baeza, joan.lafuente@autonoma.cat
 
-Maiol Sabater, 
+Maiol Sabater, maiol.sabater@autonoma.cat
 
 Neil de la Fuente,
 
