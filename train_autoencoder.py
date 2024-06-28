@@ -217,7 +217,7 @@ elif params["train_autoencoder"]:
                                         label2use=0,
                                         name_model=f'{run_path}/Weights/contr_sup_{name_yaml}.pth')
 else:
-    # Loada previously trained model
+    # Load a previously trained model
     model.load_state_dict(torch.load(f'{run_path}/Weights/contr_sup_{name_yaml}.pth', map_location=device))
     print("Model loaded")
 
@@ -435,6 +435,11 @@ if params["searchBestTreshold"]:
         knn = clf.best_estimator_
         preds = knn.predict(test_out)
 
+        # Get the confidence of each node being an anomaly
+        confidence = knn.predict_proba(test_out)[:, 1]
+        # Compute the auc score 
+        auc = roc_auc_score(graph.y[graph.test_mask].cpu().numpy(), confidence)
+
     # Plot the confusion matrix
     cm = confusion_matrix(graph.y[graph.test_mask].cpu().numpy(), preds)
     sns.heatmap(cm, annot=True, fmt='d')
@@ -450,6 +455,8 @@ if params["searchBestTreshold"]:
 
     if DO_ROC:
         report["AUC"] = roc_auc_score(graph.y[graph.test_mask].cpu().numpy(), errors_test)
+    else:
+        report["AUC"] = auc
 
     # Save the metrics report
     with open(f'{run_path}/Report/report.txt', 'w') as file:
