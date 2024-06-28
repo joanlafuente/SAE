@@ -10,8 +10,8 @@ Our method offers significant improvements in detecting fraudulent activities, t
 
 Additional information from the project is provided on the project [report](possarLink).
 
-## Application overview 
-<!-- Aixo no se si cal o no aqui pero bueno com ho hem deescriure pel report ho podriem possar-->
+<!-- ## Application overview 
+Aixo no se si cal o no aqui pero bueno com ho hem deescriure pel report ho podriem possar -->
 
 ## Data
 We use two graphs provided by [CARE-GNN repository](https://github.com/YingtongDou/CARE-GNN?tab=readme-ov-file). 

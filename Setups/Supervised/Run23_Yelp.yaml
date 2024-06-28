@@ -6,7 +6,7 @@ ContrastiveAndClassification: True
 weight_triplet: 1
 weight_classification: 1
 
-OnlyEval: False
+OnlyEval: True
 GenerateTSNE: True
 
 # If not set uses tsne
