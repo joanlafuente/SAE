@@ -1,8 +1,9 @@
 run_name: "Run23_Amz"
 data: "amz"
 
-train_contrastive: True
-train_head: True
+train_contrastive: False
+train_head: False
+onlyEvaluate: True
 
 batch_size: 150
 epochs: 100

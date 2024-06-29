@@ -82,7 +82,7 @@ if params["train_contrastive"]:
                                         config=params,
                                         name_model=f'{run_path}/Weights/contr_sup_{name_yaml}.pth')
 else:
-    model.load_state_dict(torch.load(f'{run_path}/Weights/contr_sup_{name_yaml}.pth'))
+    model.load_state_dict(torch.load(f'{run_path}/Weights/contr_sup_{name_yaml}.pth', map_location=device))
 
 # Get the embeddings of the nodes
 model.eval()
@@ -249,8 +249,124 @@ if params["train_head"]:
 
     # Compute the classification report, it includes precision, recall, f1-score for each class
     report = classification_report(graph.y[graph.test_mask].cpu().numpy(), predictions[graph.test_mask].cpu().numpy(), output_dict=True)
-    # Compute ROC-AUC
+
+    # Computing the area under the curve and the average precision scores
     report["ROC_AUC"] = compute_ROC_AUC(model, graph, graph.test_mask)
+    report["AP"] = compute_Average_Precision(model, graph, graph.test_mask)
+
+    # Computing the ROC curve
+    fpr, tpr = compute_ROC_curve(model, graph, graph.test_mask)
+    # Plotting the ROC curve
+    plt.figure()
+    lw = 2
+    plt.plot(
+        fpr,
+        tpr,
+        color="darkorange",
+        lw=lw,
+        label="ROC curve",
+    )
+    plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve')
+    plt.savefig(f'{run_path}/Plots/roc_curve_{name_yaml}.png')
+    plt.close()
+
+    # Computing the Precision-Recall curve
+    precision, recall = compute_PR_curve(model, graph, graph.test_mask)
+
+    # Plotting the Precision-Recall curve
+    plt.figure()
+    lw = 2
+    plt.plot(
+        recall,
+        precision,
+        color="darkorange",
+        lw=lw,
+        label="Precision-Recall curve",
+    )
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title("Precision-Recall curve")
+    plt.savefig(f'{run_path}/Plots/PR_curve_{name_yaml}.png')
+    plt.close()
+
+
+    # Save the classification metrics
+    with open(f'{run_path}/Report/contr_sup_{name_yaml}.txt', 'w') as file:
+        file.write(str(report))
+
+if "onlyEvaluate" in params and params["onlyEvaluate"]:
+    # Load the best model
+    model.load_state_dict(torch.load(f'{run_path}/Weights/head_contr_sup_{name_yaml}.pth', map_location=device))
+
+    # Evaluate the model and get the predictions
+    test_acc, f1, predictions = eval_node_classifier(model, graph, graph.test_mask)
+    print(f'Test Acc: {test_acc:.3f}, Test F1: {f1:.3f}')
+
+    # Compute the confusion matrix
+    conf_matrix = confusion_matrix(graph.y[graph.test_mask].cpu().numpy(),
+                                predictions[graph.test_mask].cpu().numpy())
+    sns.heatmap(conf_matrix, annot=True, fmt='d')
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+    plt.savefig(f'{run_path}/Plots/cm_contr_sup_{name_yaml}.png')
+    plt.close()
+
+    # Compute the classification report, it includes precision, recall, f1-score for each class
+    report = classification_report(graph.y[graph.test_mask].cpu().numpy(), predictions[graph.test_mask].cpu().numpy(), output_dict=True)
+
+    # Computing the area under the curve and the average precision scores
+    report["ROC_AUC"] = compute_ROC_AUC(model, graph, graph.test_mask)
+    report["AP"] = compute_Average_Precision(model, graph, graph.test_mask)
+
+    # Computing the ROC curve
+    fpr, tpr = compute_ROC_curve(model, graph, graph.test_mask)
+    # Plotting the ROC curve
+    plt.figure()
+    lw = 2
+    plt.plot(
+        fpr,
+        tpr,
+        color="darkorange",
+        lw=lw,
+        label="ROC curve",
+    )
+    plt.plot([0, 1], [0, 1], color="navy", lw=lw, linestyle="--")
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve')
+    plt.savefig(f'{run_path}/Plots/roc_curve_{name_yaml}.png')
+    plt.close()
+
+    # Computing the Precision-Recall curve
+    precision, recall = compute_PR_curve(model, graph, graph.test_mask)
+
+    # Plotting the Precision-Recall curve
+    plt.figure()
+    lw = 2
+    plt.plot(
+        recall,
+        precision,
+        color="darkorange",
+        lw=lw,
+        label="Precision-Recall curve",
+    )
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title("Precision-Recall curve")
+    plt.savefig(f'{run_path}/Plots/PR_curve_{name_yaml}.png')
+    plt.close()
+
 
     # Save the classification metrics
     with open(f'{run_path}/Report/contr_sup_{name_yaml}.txt', 'w') as file:
