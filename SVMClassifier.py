@@ -68,7 +68,7 @@ elif run_type in ("Autoencoder", "SelfSupervisedContrastive", "SupervisedContras
     with open(f'{run_path}/Pickles/embeds_contr_sup_{name_yaml}.pkl', "rb") as f:
         embeds = pkl.load(f)
     with open(f'{run_path}/Pickles/train_test_val_masks_{name_yaml}.pkl', "rb") as f:
-        train_mask, val_mask, test_mask = pkl.load(f)
+        train_mask, val_mask, test_mask, train_mask_contrastive = pkl.load(f)
 
 # Create a folder for the GMM plots, results and prediction
 if not os.path.exists(f'{run_path}/SVM'):

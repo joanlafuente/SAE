@@ -139,7 +139,7 @@ This will yield an HTTP address in the console, by clicking in this address it w
 
 
 ## Contributors
-Joan Lafuente Baeza, joan.lafuente@autonoma.cat
+Joan Lafuente, joan.lafuente@autonoma.cat
 
 Maiol Sabater, maiol.sabater@autonoma.cat
 
