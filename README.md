@@ -143,7 +143,7 @@ Joan Lafuente, joan.lafuente@autonoma.cat
 
 Maiol Sabater, maiol.sabater@autonoma.cat
 
-Neil de la Fuente,
+Neil de la Fuente, neil.delafuente@autonoma.cat  
 
 Daniel Vidal, 
 
