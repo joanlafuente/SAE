@@ -1,4 +1,4 @@
-# Self Attending Edges
+# Self Attending Edges (SAE)
 
 ![alt text](Images/pipeline.png)
 
@@ -100,7 +100,7 @@ Reviews considered spam are the anomalous nodes.
 Before starting clone the repository:
 
 ```
-git clone https://github.com/joanlafuente/StorIA.git
+git clone https://github.com/joanlafuente/SAE.git
 ```
 And then create a conda environment with the following command:
 ```
@@ -143,9 +143,9 @@ Joan Lafuente, joan.lafuente@autonoma.cat
 
 Maiol Sabater, maiol.sabater@autonoma.cat
 
-Neil de la Fuente,
+Neil de la Fuente, neil.delafuente@autonoma.cat  
 
-Daniel Vidal, 
+Daniel Vidal, danielalejandro.vidal@autonoma.cat
 
 
 Anomaly detection on graphs project for synthesis-project subject 2024. 
