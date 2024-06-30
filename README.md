@@ -145,7 +145,7 @@ Maiol Sabater, maiol.sabater@autonoma.cat
 
 Neil de la Fuente, neil.delafuente@autonoma.cat  
 
-Daniel Vidal, 
+Daniel Vidal, danielalejandro.vidal@autonoma.cat
 
 
 Anomaly detection on graphs project for synthesis-project subject 2024. 
