@@ -8,7 +8,7 @@ Detecting anomalies in graph-structured data is a crucial task for preventing cy
 
 Our method offers significant improvements in detecting fraudulent activities, thereby enhancing data integrity and maintaining consumer trust. The ability to accurately detect anomalies in graph-structured data can help organizations prevent various forms of cyber fraud, safeguarding financial interests and upholding the credibility of digital platforms.
 
-Additional information from the project is provided on the project [report](possarLink).
+Additional information from the project is provided on the project [report](https://github.com/joanlafuente/SAE/blob/main/Images/report.pdf).
 
 <!-- ## Application overview 
 Aixo no se si cal o no aqui pero bueno com ho hem deescriure pel report ho podriem possar -->
